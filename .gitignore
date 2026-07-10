@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+resources/sidecar/
+sidecar/**/bin/
+sidecar/**/obj/
+*.log
+.DS_Store
+*.bak

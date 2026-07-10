@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gtrace": {
+      "command": "npx",
+      "args": ["tsx", "bin/gtrace-mcp.ts"]
+    }
+  }
+}

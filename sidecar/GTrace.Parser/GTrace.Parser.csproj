@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>GTrace.Parser</AssemblyName>
+    <RootNamespace>GTrace.Parser</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Sidecar Windows-only (DPAPI) : la cible reste net8.0, on assume l'API Windows. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="161.8910.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

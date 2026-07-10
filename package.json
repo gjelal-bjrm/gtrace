@@ -1,0 +1,45 @@
+{
+  "name": "gtrace",
+  "version": "0.1.0",
+  "description": "Débogueur T-SQL time-travel pour SQL Server",
+  "private": true,
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "build:sidecar": "dotnet publish sidecar/GTrace.Parser/GTrace.Parser.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o resources/sidecar",
+    "test:integration": "tsx --tsconfig tsconfig.node.json scripts/integration-replay.ts && tsx --tsconfig tsconfig.node.json scripts/integration-bigproc.ts && tsx --tsconfig tsconfig.node.json scripts/integration-breakpoints.ts && tsx --tsconfig tsconfig.node.json scripts/integration-xevents.ts && tsx --tsconfig tsconfig.node.json scripts/integration-phase4.ts && tsx --tsconfig tsconfig.node.json scripts/integration-phase5.ts && tsx --tsconfig tsconfig.node.json scripts/integration-mcp.ts && tsx --tsconfig tsconfig.node.json scripts/integration-mcp-readonly.ts && tsx --tsconfig tsconfig.node.json scripts/integration-headless.ts && tsx --tsconfig tsconfig.node.json scripts/integration-ai.ts",
+    "mcp": "tsx bin/gtrace-mcp.ts",
+    "headless": "tsx bin/gtrace-run.ts",
+    "build": "npm run typecheck && electron-vite build",
+    "build:all": "npm run build:sidecar && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "monaco-editor": "^0.55.1",
+    "mssql": "^12.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.25.76",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^20.17.9",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-vite": "^2.3.0",
+    "eslint": "^9.15.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.23.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.16.0",
+    "vite": "^5.4.11"
+  }
+}
