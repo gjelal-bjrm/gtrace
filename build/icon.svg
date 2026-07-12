@@ -1,0 +1,45 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Icône GTrace : « G-rewind » — le G est formé par un arc ambre (retour en
+    arrière) et son ouverture accueille un double chevron ⏪ ivoire (rejouer).
+    Badge sombre arrondi, dégradés + relief (style Windows 11 / VS Code).
+    Rasterisée en build/icon.png par scripts/gen-icon.cjs.
+  -->
+  <defs>
+    <linearGradient id="amber" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffd977"/>
+      <stop offset="0.5" stop-color="#f0a93e"/>
+      <stop offset="1" stop-color="#d07a1e"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4252"/>
+      <stop offset="0.55" stop-color="#232935"/>
+      <stop offset="1" stop-color="#161a22"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c8cdd6"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="13" stdDeviation="13" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="118" fill="url(#dark)"/>
+  <rect x="0" y="0" width="512" height="266" rx="118" fill="url(#sheen)"/>
+  <rect x="6" y="6" width="500" height="500" rx="112" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="8"/>
+
+  <!-- Arc du G (rewind) -->
+  <path d="M 256 123 A 143 143 0 1 0 399 266" fill="none" stroke="url(#amber)"
+        stroke-width="59" stroke-linecap="round" filter="url(#shadow)"/>
+
+  <!-- Double chevron ⏪ dans l'ouverture du G -->
+  <g filter="url(#shadow)">
+    <polygon points="307,215 307,317 225,266" fill="url(#ivory)"/>
+    <polygon points="389,215 389,317 307,266" fill="url(#ivory)"/>
+  </g>
+</svg>

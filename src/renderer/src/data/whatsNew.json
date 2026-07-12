@@ -1,0 +1,17 @@
+[
+  {
+    "version": "0.1.1",
+    "notes": [
+      "First commit"
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "notes": [
+      "Première version installable de GTrace : replay time-travel, breakpoints simulés, profilage Extended Events, snapshots et watch.",
+      "UI type SSMS : connexions multiples, explorateur d'objets, éditeur multi-onglets avec auto-complétion.",
+      "Espace de travail persistant : onglets, connexions et fichiers restaurés au lancement.",
+      "Mises à jour automatiques : GTrace vérifie à chaque lancement et propose d'installer les nouvelles versions."
+    ]
+  }
+]

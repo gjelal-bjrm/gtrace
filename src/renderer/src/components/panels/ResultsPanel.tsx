@@ -1,4 +1,5 @@
-import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
+import { useReplayStore } from '../../stores/replayStore'
+import DataGrid from './DataGrid'
 
 export default function ResultsPanel(): JSX.Element {
   const run = useReplayStore((s) => s.run)
@@ -23,25 +24,7 @@ export default function ResultsPanel(): JSX.Element {
               </button>
             )}
           </h3>
-          <table>
-            <thead>
-              <tr>
-                {rs.columns.map((c, i) => (
-                  <th key={i}>{c || `(col ${i + 1})`}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rs.rows.slice(0, 200).map((row, ri) => (
-                <tr key={ri}>
-                  {row.map((cell, ci) => (
-                    <td key={ci}>{formatSqlValue(cell)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rs.rows.length > 200 && <p className="hint">… {rs.rows.length - 200} lignes masquées</p>}
+          <DataGrid columns={rs.columns} rows={rs.rows} />
         </div>
       ))}
     </div>

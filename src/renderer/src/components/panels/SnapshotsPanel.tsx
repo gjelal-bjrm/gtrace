@@ -105,37 +105,51 @@ export default function SnapshotsPanel(): JSX.Element {
               {previous ? `, +${[...addedKeys.values()].reduce((a, b) => a + b, 0)} / −${removedRows.length} vs step ${previous.stepIndex}` : ''}
               )
             </h3>
-            <table>
-              <thead>
-                <tr>
-                  {snapshot.columns.map((c, i) => (
-                    <th key={i}>{c || `(col ${i + 1})`}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {snapshot.rows.map((row, ri) => {
-                  const k = rowKey(row)
-                  const used = seen.get(k) ?? 0
-                  const isAdded = used < (addedKeys.get(k) ?? 0)
-                  seen.set(k, used + 1)
-                  return (
-                    <tr key={ri} className={isAdded ? 'row-added' : ''}>
-                      {row.map((cell, ci) => (
-                        <td key={ci}>{formatSqlValue(cell)}</td>
-                      ))}
-                    </tr>
-                  )
-                })}
-                {removedRows.map((row, ri) => (
-                  <tr key={`del-${ri}`} className="row-removed">
-                    {row.map((cell, ci) => (
-                      <td key={ci}>{formatSqlValue(cell)}</td>
+            <div className="grid-scroll">
+              <table className="data-grid snap-grid">
+                <thead>
+                  <tr>
+                    {snapshot.columns.map((c, i) => (
+                      <th key={i} title={c}>
+                        {c || `(col ${i + 1})`}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {snapshot.rows.map((row, ri) => {
+                    const k = rowKey(row)
+                    const used = seen.get(k) ?? 0
+                    const isAdded = used < (addedKeys.get(k) ?? 0)
+                    seen.set(k, used + 1)
+                    return (
+                      <tr key={ri} className={isAdded ? 'row-added' : ''}>
+                        {row.map((cell, ci) => {
+                          const t = formatSqlValue(cell)
+                          return (
+                            <td key={ci} title={t}>
+                              {t}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                  {removedRows.map((row, ri) => (
+                    <tr key={`del-${ri}`} className="row-removed">
+                      {row.map((cell, ci) => {
+                        const t = formatSqlValue(cell)
+                        return (
+                          <td key={ci} title={t}>
+                            {t}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="hint">
               Points de capture : {snaps.map((s) => `step ${s.stepIndex}`).join(' → ')}
             </p>

@@ -479,3 +479,21 @@ export interface McpAuditEntry {
   ok: boolean
   message?: string
 }
+
+// ─── Mises à jour automatiques (electron-updater, releases GitHub) ──────────
+
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'none'; version: string }
+  | { state: 'unsupported' }
+  | { state: 'error'; message: string }
+
+export interface UpdateSnapshot {
+  status: UpdateStatus
+  /** Version de l'application en cours d'exécution. */
+  version: string
+}

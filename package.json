@@ -1,7 +1,8 @@
 {
   "name": "gtrace",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Débogueur T-SQL time-travel pour SQL Server",
+  "author": "GTrace",
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
@@ -15,10 +16,17 @@
     "mcp": "tsx bin/gtrace-mcp.ts",
     "headless": "tsx bin/gtrace-run.ts",
     "build": "npm run typecheck && electron-vite build",
-    "build:all": "npm run build:sidecar && npm run build"
+    "build:all": "npm run build:sidecar && npm run build",
+    "gen:icon": "electron scripts/gen-icon.cjs",
+    "dist": "npm run build && electron-builder --win",
+    "dist:dir": "npm run build && electron-builder --win --dir",
+    "dist:full": "npm run build:all && electron-builder --win",
+    "publish": "npm run build && electron-builder --win --publish always",
+    "publish:full": "npm run build:all && electron-builder --win --publish always"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "electron-updater": "^6.8.9",
     "monaco-editor": "^0.55.1",
     "mssql": "^12.7.0",
     "react": "^18.3.1",
@@ -34,6 +42,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "eslint": "^9.15.0",
     "prettier": "^3.3.3",

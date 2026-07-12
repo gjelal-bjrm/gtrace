@@ -26,6 +26,8 @@ import type {
   SaveConnectionInput,
   SidecarStatus,
   TestResult,
+  UpdateSnapshot,
+  UpdateStatus,
   WorkspaceLoadResult,
   WorkspaceState,
   XeStartRequest,
@@ -84,6 +86,9 @@ export interface IpcContract {
   'history:list': () => Promise<HistoryEntrySummary[]>
   'history:load': (id: string) => Promise<HistoryEntry>
   'history:delete': (id: string) => Promise<void>
+  'update:check': () => Promise<void>
+  'update:install': () => Promise<void>
+  'update:get': () => Promise<UpdateSnapshot>
 }
 
 export type IpcChannel = keyof IpcContract
@@ -136,7 +141,11 @@ export interface GTraceApi {
   historyList: () => Promise<HistoryEntrySummary[]>
   historyLoad: (id: string) => Promise<HistoryEntry>
   historyDelete: (id: string) => Promise<void>
+  updateCheck: () => Promise<void>
+  updateInstall: () => Promise<void>
+  updateGet: () => Promise<UpdateSnapshot>
   /** Abonnement aux événements de session ; renvoie la fonction de désabonnement. */
   onDebugEvent: (cb: (event: DebugSessionEvent) => void) => () => void
   onXeEvent: (cb: (event: XEventsEvent) => void) => () => void
+  onUpdateStatus: (cb: (status: UpdateStatus) => void) => () => void
 }

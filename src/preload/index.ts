@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { GTraceApi } from '@shared/ipc'
-import type { DebugSessionEvent, XEventsEvent } from '@shared/types'
+import type { DebugSessionEvent, UpdateStatus, XEventsEvent } from '@shared/types'
 
 const api: GTraceApi = {
   parse: (sql, compatLevel) => ipcRenderer.invoke('sidecar:parse', sql, compatLevel),
@@ -47,6 +47,14 @@ const api: GTraceApi = {
   historyList: () => ipcRenderer.invoke('history:list'),
   historyLoad: (id) => ipcRenderer.invoke('history:load', id),
   historyDelete: (id) => ipcRenderer.invoke('history:delete', id),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateGet: () => ipcRenderer.invoke('update:get'),
+  onUpdateStatus: (cb) => {
+    const listener = (_event: IpcRendererEvent, status: UpdateStatus): void => cb(status)
+    ipcRenderer.on('update:onStatus', listener)
+    return () => ipcRenderer.removeListener('update:onStatus', listener)
+  },
   onDebugEvent: (cb) => {
     const listener = (_event: IpcRendererEvent, payload: DebugSessionEvent): void => cb(payload)
     ipcRenderer.on('debug:event', listener)

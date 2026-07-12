@@ -11,6 +11,7 @@ import { McpAudit } from './mcp/audit'
 import { AiDiagnosisService } from './ai/AiDiagnosisService'
 import { WorkspaceStore } from './services/WorkspaceStore'
 import { closeAllPools } from './services/SqlService'
+import { initAutoUpdate, registerUpdateHandlers } from './services/UpdateService'
 import { registerIpcHandlers } from './ipc/handlers'
 
 let sidecar: SidecarService | null = null
@@ -30,6 +31,9 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#16181d',
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'icon.png')
+      : join(app.getAppPath(), 'build', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -69,7 +73,10 @@ app.whenReady().then(() => {
     new AiDiagnosisService(userData, sidecar),
     new WorkspaceStore(userData)
   )
+  registerUpdateHandlers()
   createWindow()
+  // Vérifie au lancement puis toutes les 6 h (inactif en dev).
+  initAutoUpdate()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

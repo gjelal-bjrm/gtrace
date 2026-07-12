@@ -1,0 +1,62 @@
+appId: com.gtrace.app
+productName: GTrace
+
+# Flux de mise à jour (electron-updater lit la même config) : releases GitHub.
+# La release est créée en BROUILLON (défaut) : GitHub refuse une release publiée
+# si le tag n'existe pas encore. On publie le brouillon en un clic sur GitHub
+# (cela crée le tag) ; ensuite l'auto-update voit la version.
+publish:
+  provider: github
+  owner: gjelal-bjrm
+  repo: gtrace
+
+directories:
+  output: dist
+  buildResources: build
+
+# mssql/tedious sont en pur JS : aucune recompilation native nécessaire.
+npmRebuild: false
+
+# Inclut tout par défaut (out/ + node_modules de prod), sauf les fichiers de dev.
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!sidecar/*'
+  - '!scripts/*'
+  - '!bin/*'
+  - '!docs/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!**/{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!**/{.eslintrc*,eslint.config*,.prettier*,.editorconfig,.gitignore,.gitattributes}'
+  - '!**/{README.md,CHANGELOG.md,gtrace-spec.md,gtrace-phase6-mcp.md}'
+  - '!**/{.env,.env.*,.npmrc}'
+  - '!build/**'
+  - '!*.zip'
+  - '!*.bat'
+  - '!*.bak'
+
+# Le sidecar ScriptDom (publish self-contained win-x64) et l'icône runtime
+# vivent hors asar : le main le lance via process.resourcesPath/sidecar/.
+extraResources:
+  - from: resources/sidecar
+    to: sidecar
+  - from: build/icon.png
+    to: icon.png
+
+win:
+  target:
+    - nsis
+  icon: build/icon.png
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: GTrace
+  uninstallDisplayName: GTrace
+  # Pas de lancement auto en fin d'install (évite l'erreur « .lnk sans
+  # application associée » si l'exe vient d'être bloqué par l'antivirus).
+  runAfterFinish: false

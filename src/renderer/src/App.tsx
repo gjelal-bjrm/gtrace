@@ -27,6 +27,10 @@ import AiActivityPanel from './components/panels/AiActivityPanel'
 import DiagnosisModal from './components/panels/DiagnosisModal'
 import TabBar from './components/editor/TabBar'
 import Splitter from './components/layout/Splitter'
+import { Wordmark } from './components/layout/Logo'
+import UpdateBanner from './components/layout/UpdateBanner'
+import WhatsNew from './components/layout/WhatsNew'
+import { useUpdateStore } from './stores/updateStore'
 import { setCompletionSchema } from './components/editor/completion'
 import { useReplayStore } from './stores/replayStore'
 
@@ -123,6 +127,8 @@ export default function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('run')
   const [showExplorer, setShowExplorer] = useState(true)
   const [showConnect, setShowConnect] = useState(false)
+  /** Mode plein écran données : masque explorateur + éditeur, panneau en grand. */
+  const [focusMode, setFocusMode] = useState(false)
   // Tailles redimensionnables des zones (mémorisées entre sessions)
   const [explorerWidth, setExplorerWidth] = useState(() => loadSize('gtrace.explorerW', 288))
   const [sidePanelWidth, setSidePanelWidth] = useState(() => loadSize('gtrace.sideW', 440))
@@ -144,6 +150,19 @@ export default function App(): JSX.Element {
   const [historyVersion, setHistoryVersion] = useState(0)
   const [showAiActivity, setShowAiActivity] = useState(false)
   const [showDiagnosis, setShowDiagnosis] = useState(false)
+  /** Nouveautés : depuis quelle version montrer les notes (null = fermé). */
+  const [whatsNewSince, setWhatsNewSince] = useState<string | null>(null)
+  const appVersion = useUpdateStore((s) => s.version)
+  // Abonnement au statut de mise à jour + pop-up Nouveautés une fois par version.
+  useEffect(() => {
+    const unsub = useUpdateStore.getState().init()
+    void window.gtrace.updateGet().then(({ version }) => {
+      const last = localStorage.getItem('gtrace.lastSeenVersion')
+      if (last && last !== version) setWhatsNewSince(last)
+      if (last !== version) localStorage.setItem('gtrace.lastSeenVersion', version)
+    })
+    return unsub
+  }, [])
   /** Bases par connexion (pour le sélecteur de base de la barre d'outils). */
   const [dbCache, setDbCache] = useState<Record<string, DatabaseInfo[]>>({})
   const dbCacheRef = useRef(dbCache)
@@ -980,8 +999,7 @@ export default function App(): JSX.Element {
           >
             ☰
           </button>
-          <span className="brand-name">GTrace</span>
-          <span className="phase">débogueur T-SQL</span>
+          <Wordmark />
         </span>
         <span className="topbar-right">
           <button className="btn btn-ghost" onClick={() => setShowAiActivity(true)} title="Accès IA / MCP">
@@ -990,11 +1008,29 @@ export default function App(): JSX.Element {
           <span className={`sidecar-status ${status?.running ? 'ok' : 'ko'}`}>
             sidecar {status?.running ? `ScriptDom ${status.version ?? '?'}` : 'inactif'}
           </span>
+          <button
+            className="btn btn-ghost app-version"
+            onClick={() => setWhatsNewSince('')}
+            title="Voir les nouveautés"
+          >
+            v{appVersion || '…'}
+          </button>
+          <button
+            className="btn btn-icon"
+            onClick={() => useUpdateStore.getState().check()}
+            title="Vérifier les mises à jour"
+          >
+            ⟳
+          </button>
         </span>
       </header>
+      <UpdateBanner />
 
       {showConnect && (
         <ConnectDialog onConnected={onConnected} onClose={() => setShowConnect(false)} />
+      )}
+      {whatsNewSince !== null && (
+        <WhatsNew since={whatsNewSince} onClose={() => setWhatsNewSince(null)} />
       )}
       {showAiActivity && (
         <AiActivityPanel activeConnection={activeConn} onClose={() => setShowAiActivity(false)} />
@@ -1152,8 +1188,8 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      <main className="workspace">
-        {showExplorer && (
+      <main className={`workspace${focusMode ? ' focus-mode' : ''}`}>
+        {!focusMode && showExplorer && (
           <>
             <aside className="explorer-pane" style={{ width: explorerWidth }}>
               <ObjectExplorer
@@ -1174,32 +1210,36 @@ export default function App(): JSX.Element {
             />
           </>
         )}
-        <section className="editor-pane">
-          <TabBar
-            locked={locked}
-            onSwitch={switchToTab}
-            onClose={doCloseTab}
-            onNew={doNew}
-            onOpen={() => void doOpen()}
-            onSave={() => void doSave(false)}
-            onSaveAs={() => void doSave(true)}
-          />
-          <div className="editor-body">
-            <CodeEditor
-              value={sql}
-              onChange={onSqlChange}
-              decorations={decorations}
-              revealLine={revealLine}
-              breakpoints={breakpoints}
-              onToggleBreakpoint={toggleBreakpoint}
-              onSelectionChange={onEditorSelection}
-            />
-          </div>
-        </section>
+        {!focusMode && (
+          <>
+            <section className="editor-pane">
+              <TabBar
+                locked={locked}
+                onSwitch={switchToTab}
+                onClose={doCloseTab}
+                onNew={doNew}
+                onOpen={() => void doOpen()}
+                onSave={() => void doSave(false)}
+                onSaveAs={() => void doSave(true)}
+              />
+              <div className="editor-body">
+                <CodeEditor
+                  value={sql}
+                  onChange={onSqlChange}
+                  decorations={decorations}
+                  revealLine={revealLine}
+                  breakpoints={breakpoints}
+                  onToggleBreakpoint={toggleBreakpoint}
+                  onSelectionChange={onEditorSelection}
+                />
+              </div>
+            </section>
 
-        <Splitter axis="x" onDrag={(d) => setSidePanelWidth((w) => clamp(w - d, 320, 820))} />
+            <Splitter axis="x" onDrag={(d) => setSidePanelWidth((w) => clamp(w - d, 320, 820))} />
+          </>
+        )}
 
-        <aside className="side-panel" style={{ width: sidePanelWidth }}>
+        <aside className="side-panel" style={focusMode ? undefined : { width: sidePanelWidth }}>
           <nav className="tabs">
             <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')}>
               Exécution
@@ -1224,6 +1264,17 @@ export default function App(): JSX.Element {
             </button>
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>
               Profil
+            </button>
+            <button
+              className={`focus-toggle${focusMode ? ' active' : ''}`}
+              onClick={() => setFocusMode((f) => !f)}
+              title={
+                focusMode
+                  ? 'Quitter le plein écran données'
+                  : 'Afficher les données en plein écran (masque éditeur + explorateur)'
+              }
+            >
+              {focusMode ? '⤡ Réduire' : '⤢ Plein écran'}
             </button>
           </nav>
           <div className="tab-content">

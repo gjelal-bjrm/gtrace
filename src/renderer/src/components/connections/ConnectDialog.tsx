@@ -108,12 +108,15 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
     }
   }, [selectedSaved, password, server, port, database, user, rememberName, rememberProd, onConnected, onClose])
 
-  const deleteSaved = useCallback(async () => {
-    if (!savedId) return
-    await window.gtrace.deleteConnection(savedId)
-    setSavedId('')
-    await refreshSaved()
-  }, [savedId, refreshSaved])
+  const deleteSaved = useCallback(
+    async (id: string, name: string) => {
+      if (!confirm(`Supprimer la connexion enregistrée « ${name} » ?`)) return
+      await window.gtrace.deleteConnection(id)
+      setSavedId((cur) => (cur === id ? '' : cur))
+      await refreshSaved()
+    },
+    [refreshSaved]
+  )
 
   const alreadyOpen = useConnectionsStore((s) => s.connections)
 
@@ -130,25 +133,50 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
         <div className="modal-body">
           {error && <div className="error-box">{error}</div>}
 
-          <div className="form-grid">
-            <label>Connexion enregistrée</label>
-            <div className="form-inline">
-              <select value={savedId} onChange={(e) => setSavedId(e.target.value)}>
-                <option value="">(nouvelle connexion)</option>
-                {saved.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.production ? '⚠ ' : ''}
-                    {c.name} — {c.server}
-                  </option>
-                ))}
-              </select>
-              {savedId && (
-                <button className="btn btn-icon" onClick={deleteSaved} title="Supprimer cette connexion enregistrée">
-                  🗑
-                </button>
-              )}
+          {saved.length > 0 && (
+            <div className="saved-list">
+              <button
+                type="button"
+                className={`saved-row${savedId === '' ? ' active' : ''}`}
+                onClick={() => setSavedId('')}
+              >
+                <span className="saved-row-main">
+                  <span className="saved-row-name">＋ Nouvelle connexion</span>
+                </span>
+              </button>
+              {saved.map((c) => (
+                <div
+                  key={c.id}
+                  className={`saved-row${savedId === c.id ? ' active' : ''}`}
+                  onClick={() => setSavedId(c.id)}
+                >
+                  <span className="saved-row-main">
+                    <span className="saved-row-name">
+                      {c.production ? '⚠ ' : ''}
+                      {c.name}
+                    </span>
+                    <span className="saved-row-meta">
+                      {c.server}
+                      {c.port ? `,${c.port}` : ''} · {c.user}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-icon saved-row-del"
+                    title="Supprimer cette connexion enregistrée"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void deleteSaved(c.id, c.name)
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
             </div>
+          )}
 
+          <div className="form-grid">
             <label>Nom du serveur</label>
             <div className="form-inline">
               <input value={server} onChange={(e) => setServer(e.target.value)} placeholder="localhost" />

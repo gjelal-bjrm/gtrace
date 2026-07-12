@@ -202,21 +202,135 @@ button:disabled {
   gap: 8px;
 }
 
-.brand-name {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--accent);
+/* Lockup « M2 » : icône G-rewind + GTrace bicolore + légende. */
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.phase {
+.wordmark svg {
+  display: block;
+  border-radius: 6px;
+}
+
+.wordmark-name {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.wordmark-tagline {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  margin-left: 9px;
+  transform: translateY(1px);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.app-version {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ─── Bandeau de mise à jour ─────────────────────────────────────────────── */
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.update-banner.accent {
+  color: var(--accent);
+}
+
+.update-banner.danger {
+  color: var(--error);
+}
+
+.update-banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Pop-up « Nouveautés » ──────────────────────────────────────────────── */
+
+.whats-new {
+  width: min(520px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.whats-new-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.whats-new-title svg {
+  border-radius: 5px;
+}
+
+.whats-new-version {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.whats-new-body {
+  overflow: auto;
+}
+
+.whats-new-release {
+  margin-bottom: 16px;
+}
+
+.whats-new-release-version {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.whats-new-release ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.whats-new-release li::marker {
+  color: var(--accent);
+}
+
+.whats-new .dim {
+  color: var(--text-dim);
+  font-size: 13px;
 }
 
 .sidecar-status {
@@ -380,6 +494,75 @@ button:disabled {
 
 .connect-dialog {
   width: min(520px, 92vw);
+}
+
+/* Liste des connexions enregistrées (sélection + suppression par ligne). */
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 190px;
+  overflow: auto;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-input);
+}
+
+.saved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.saved-row:hover {
+  background: var(--bg-hover);
+}
+
+.saved-row.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.saved-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-row-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-row-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.saved-row-del {
+  flex: 0 0 auto;
+  opacity: 0.55;
+}
+
+.saved-row-del:hover {
+  opacity: 1;
+  color: var(--error);
 }
 
 .form-grid {
@@ -850,6 +1033,12 @@ button:disabled {
   background: var(--bg);
 }
 
+/* Mode plein écran données : le panneau prend toute la largeur disponible. */
+.workspace.focus-mode .side-panel {
+  flex: 1 1 auto;
+  width: auto !important;
+}
+
 .tabs {
   display: flex;
   background: var(--bg-panel);
@@ -891,6 +1080,28 @@ button:disabled {
 
 .tabs button.active .tab-count {
   color: var(--accent);
+}
+
+/* Bascule plein écran données : ne s'étire pas, distincte à droite. */
+.tabs .focus-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 8px 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--text-dim);
+  border-left: 1px solid var(--border);
+}
+
+.tabs .focus-toggle:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.tabs .focus-toggle.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-bottom-color: transparent;
 }
 
 .tab-content {
@@ -1008,6 +1219,95 @@ th {
   background: var(--error-dim);
   text-decoration: line-through;
   color: var(--text-dim);
+}
+
+/* ─── Grille de données lisible (résultats, snapshots) ───────────────────── */
+
+.grid-block {
+  margin-bottom: 6px;
+}
+
+.grid-scroll {
+  overflow: auto;
+  max-height: 62vh;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-input);
+}
+
+/* Largeur intrinsèque : les colonnes ne sont pas compressées, on défile. */
+.data-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.data-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border);
+}
+
+.data-grid td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+/* Zébrage discret (désactivé pour les snapshots qui colorent le diff). */
+.data-grid:not(.snap-grid) tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.data-grid tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+.cell-null {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.cell-num {
+  text-align: right;
+}
+
+/* Colonne de numéros de ligne : figée à gauche. */
+.grid-rownum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-panel) !important;
+  color: var(--text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  min-width: 40px;
+}
+
+.data-grid thead .grid-rownum {
+  z-index: 3;
+}
+
+.grid-more {
+  margin-top: 4px;
+  font-size: 11px;
 }
 
 .readonly-toggle,
