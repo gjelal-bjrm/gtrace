@@ -24,7 +24,7 @@ export default function ResultsPanel(): JSX.Element {
               </button>
             )}
           </h3>
-          <DataGrid columns={rs.columns} rows={rs.rows} />
+          <DataGrid columns={rs.columns} rows={rs.rows} name={`gtrace-resultset-${rs.index + 1}`} />
         </div>
       ))}
     </div>

@@ -298,7 +298,17 @@ button:disabled {
 }
 
 .whats-new-body {
+  flex: 1;
   overflow: auto;
+}
+
+/* Pied du dialogue Nouveautés : enfant direct du modal → padding propre,
+   sinon le bouton touche le bord arrondi (overflow:hidden) et se retrouve rogné. */
+.whats-new .dialog-actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
 }
 
 .whats-new-release {
@@ -1026,9 +1036,13 @@ button:disabled {
 /* ─── Panneau droit à onglets ────────────────────────────────────────────── */
 
 .side-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  /* min-width:0 indispensable : sans lui, une table large étire le panneau
+     au-delà de la fenêtre (body overflow:hidden) → plus de scroll ni de bouton. */
+  min-width: 0;
   min-height: 0;
   background: var(--bg);
 }
@@ -1037,6 +1051,26 @@ button:disabled {
 .workspace.focus-mode .side-panel {
   flex: 1 1 auto;
   width: auto !important;
+}
+
+/* Bouton flottant de sortie du plein écran (toujours atteignable). */
+.focus-exit {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  z-index: 40;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.focus-exit:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .tabs {
@@ -1310,6 +1344,103 @@ th {
   font-size: 11px;
 }
 
+.grid-block {
+  outline: none;
+}
+
+.grid-rownum.clickable {
+  cursor: pointer;
+}
+
+.grid-rownum.clickable:hover {
+  color: var(--text);
+  background: var(--border) !important;
+}
+
+/* Ligne marquée : la couleur (inline, sur les cellules) prime sur le zébrage. */
+.data-grid tbody tr.row-marked .grid-rownum {
+  color: var(--text);
+}
+
+/* ─── Menu contextuel de la grille ───────────────────────────────────────── */
+
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 201;
+  min-width: 210px;
+  max-width: 260px;
+  padding: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+}
+
+.ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ctx-item:hover {
+  background: var(--bg-hover);
+}
+
+.ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+.ctx-label {
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.ctx-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 10px 6px;
+  align-items: center;
+}
+
+.ctx-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+
+.ctx-swatch:hover {
+  border-color: var(--text);
+}
+
+.ctx-swatch.none {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-input);
+}
+
 .readonly-toggle,
 .prod-toggle {
   font-size: 12px;
@@ -1434,6 +1565,8 @@ th {
 
 .timeline-container {
   flex-shrink: 0;
+  /* Plancher : garantit que transport + piste des steps tiennent sans être rognés. */
+  min-height: 96px;
   overflow: hidden;
   border-top: 1px solid var(--border);
 }

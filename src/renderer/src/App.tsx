@@ -35,9 +35,11 @@ import { setCompletionSchema } from './components/editor/completion'
 import { useReplayStore } from './stores/replayStore'
 
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
-function loadSize(key: string, def: number): number {
+function loadSize(key: string, def: number, min: number, max: number): number {
   const v = Number(localStorage.getItem(key))
-  return Number.isFinite(v) && v > 0 ? v : def
+  // Reborne à la lecture : une valeur héritée trop petite/grande est corrigée
+  // (sinon un ancien redimensionnement peut rendre une zone illisible/rognée).
+  return Number.isFinite(v) && v > 0 ? clamp(v, min, max) : def
 }
 import { useEditorStore } from './stores/editorStore'
 import { useConnectionsStore, type OpenConnection } from './stores/connectionsStore'
@@ -130,9 +132,9 @@ export default function App(): JSX.Element {
   /** Mode plein écran données : masque explorateur + éditeur, panneau en grand. */
   const [focusMode, setFocusMode] = useState(false)
   // Tailles redimensionnables des zones (mémorisées entre sessions)
-  const [explorerWidth, setExplorerWidth] = useState(() => loadSize('gtrace.explorerW', 288))
-  const [sidePanelWidth, setSidePanelWidth] = useState(() => loadSize('gtrace.sideW', 440))
-  const [timelineHeight, setTimelineHeight] = useState(() => loadSize('gtrace.timelineH', 132))
+  const [explorerWidth, setExplorerWidth] = useState(() => loadSize('gtrace.explorerW', 288, 190, 640))
+  const [sidePanelWidth, setSidePanelWidth] = useState(() => loadSize('gtrace.sideW', 440, 320, 820))
+  const [timelineHeight, setTimelineHeight] = useState(() => loadSize('gtrace.timelineH', 132, 96, 480))
   useEffect(() => {
     localStorage.setItem('gtrace.explorerW', String(explorerWidth))
   }, [explorerWidth])
@@ -153,6 +155,15 @@ export default function App(): JSX.Element {
   /** Nouveautés : depuis quelle version montrer les notes (null = fermé). */
   const [whatsNewSince, setWhatsNewSince] = useState<string | null>(null)
   const appVersion = useUpdateStore((s) => s.version)
+  // Échap quitte le mode plein écran données (filet de sécurité).
+  useEffect(() => {
+    if (!focusMode) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setFocusMode(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [focusMode])
   // Abonnement au statut de mise à jour + pop-up Nouveautés une fois par version.
   useEffect(() => {
     const unsub = useUpdateStore.getState().init()
@@ -1240,6 +1251,15 @@ export default function App(): JSX.Element {
         )}
 
         <aside className="side-panel" style={focusMode ? undefined : { width: sidePanelWidth }}>
+          {focusMode && (
+            <button
+              className="focus-exit"
+              onClick={() => setFocusMode(false)}
+              title="Quitter le plein écran données (Échap)"
+            >
+              ⤡ Quitter le plein écran
+            </button>
+          )}
           <nav className="tabs">
             <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')}>
               Exécution
@@ -1317,7 +1337,7 @@ export default function App(): JSX.Element {
 
       {run && (
         <>
-          <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 90, 480))} />
+          <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 96, 480))} />
           <div className="timeline-container" style={{ height: timelineHeight }}>
             <Timeline />
           </div>
