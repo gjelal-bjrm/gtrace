@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.1.5",
+    "notes": [
+      "Grille de données interactive + corrections plein écran et timeline"
+    ]
+  },
+  {
     "version": "0.1.3",
     "notes": [
       "Identité, auto-update, packaging et lisibilité des données"
