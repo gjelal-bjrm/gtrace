@@ -1,6 +1,6 @@
 {
   "name": "gtrace",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Débogueur T-SQL time-travel pour SQL Server",
   "author": "GTrace",
   "private": true,

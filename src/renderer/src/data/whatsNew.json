@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.1.6",
+    "notes": [
+      "Timeline : liseré de step non rogné (box-shadow inset au lieu d'outline)"
+    ]
+  },
+  {
     "version": "0.1.5",
     "notes": [
       "Grille de données interactive + corrections plein écran et timeline"
