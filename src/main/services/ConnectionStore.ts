@@ -53,7 +53,19 @@ export class ConnectionStore {
     if (!safeStorage.isEncryptionAvailable()) {
       throw new Error('safeStorage indisponible : impossible de chiffrer le mot de passe.')
     }
-    const existing = input.id ? this.items.find((c) => c.id === input.id) : undefined
+    // Sans id explicite, on réutilise l'entrée visant déjà la même cible
+    // (serveur + port + base + utilisateur) : enregistrer deux fois le même
+    // serveur ne doit pas créer deux entrées jumelles dans la liste.
+    const norm = (s: string): string => s.trim().toLowerCase()
+    const isSameTarget = (c: StoredConnection): boolean =>
+      norm(c.server) === norm(input.config.server) &&
+      (c.port ?? null) === (input.config.port ?? null) &&
+      norm(c.database) === norm(input.config.database) &&
+      norm(c.user) === norm(input.config.user)
+
+    const existing = input.id
+      ? this.items.find((c) => c.id === input.id)
+      : this.items.find(isSameTarget)
     const stored: StoredConnection = {
       id: existing?.id ?? randomUUID(),
       name: input.name,

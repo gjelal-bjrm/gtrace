@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { McpAuditEntry, McpConnection } from '@shared/types'
 import type { OpenConnection } from '../../stores/connectionsStore'
+import { useEscapeClose } from '../../lib/useEscapeClose'
 
 interface Props {
   /** Connexion active (celle de l'onglet courant), ou null si non connecté. */
@@ -115,9 +116,12 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
 
   const isProd = activeConnection?.production === true
 
+  useEscapeClose(onClose)
+
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal ai-activity" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal ai-activity">
         <div className="modal-header">
           <span>🤖 Accès de l&apos;IA à vos données</span>
           <button className="btn btn-icon" onClick={onClose} title="Fermer">

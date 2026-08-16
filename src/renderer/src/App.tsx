@@ -724,11 +724,19 @@ export default function App(): JSX.Element {
   // ─── Connexions ────────────────────────────────────────────────────────────
   const onConnected = useCallback(
     (conn: OpenConnection) => {
-      addConnection(conn)
-      // Lie l'onglet actif à la nouvelle connexion (comme ouvrir une requête dans SSMS).
-      useEditorStore.getState().patchActive({ connectionId: conn.id, database: null })
-      void ensureDatabases(conn)
-      setNotice(`connecté : ${conn.label} — ${conn.version}`)
+      // Pas de doublon : si ce serveur/base est déjà ouvert, on réutilise la
+      // connexion existante au lieu d'ajouter une racine identique dans l'arbre.
+      const existing = useConnectionsStore.getState().findSame(conn)
+      const target = existing ?? conn
+      if (!existing) addConnection(conn)
+      // Lie l'onglet actif à la connexion (comme ouvrir une requête dans SSMS).
+      useEditorStore.getState().patchActive({ connectionId: target.id, database: null })
+      void ensureDatabases(target)
+      setNotice(
+        existing
+          ? `déjà connecté à ${target.label} — cet onglet y est rattaché`
+          : `connecté : ${target.label} — ${target.version}`
+      )
     },
     [addConnection, ensureDatabases]
   )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionConfig, ConnectionRef, SavedConnection } from '@shared/types'
 import { useConnectionsStore, type OpenConnection } from '../../stores/connectionsStore'
+import { useEscapeClose } from '../../lib/useEscapeClose'
 
 interface Props {
   onConnected: (connection: OpenConnection) => void
@@ -120,9 +121,12 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
 
   const alreadyOpen = useConnectionsStore((s) => s.connections)
 
+  useEscapeClose(onClose)
+
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal connect-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal connect-dialog">
         <div className="modal-header">
           <span>🖥 Se connecter au serveur</span>
           <button className="btn btn-icon" onClick={onClose}>

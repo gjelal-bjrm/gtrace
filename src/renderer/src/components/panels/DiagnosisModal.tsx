@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AiConfig, ConnectionRef, HistorySaveInput, ResultSetData } from '@shared/types'
 import { formatSqlValue } from '../../stores/replayStore'
+import { useEscapeClose } from '../../lib/useEscapeClose'
 
 interface Props {
   activeRef: ConnectionRef | null
@@ -83,9 +84,12 @@ export default function DiagnosisModal({ activeRef, buildInput, onClose }: Props
     [activeRef]
   )
 
+  useEscapeClose(onClose)
+
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal ai-activity" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal ai-activity">
         <div className="modal-header">
           <span>🩺 Diagnostic IA de la session</span>
           <button className="link-btn" onClick={onClose}>

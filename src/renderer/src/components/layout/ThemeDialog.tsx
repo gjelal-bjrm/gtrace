@@ -1,6 +1,7 @@
 import type { JSX } from 'react'
 import { useAppearanceStore } from '../../stores/appearanceStore'
 import { THEMES } from '../../theme/themes'
+import { useEscapeClose } from '../../lib/useEscapeClose'
 
 /**
  * Dialogue « Apparence » : choix du thème parmi des palettes prédéfinies
@@ -11,9 +12,12 @@ export default function ThemeDialog({ onClose }: { onClose: () => void }): JSX.E
   const appearance = useAppearanceStore((s) => s.appearance)
   const update = useAppearanceStore((s) => s.update)
 
+  useEscapeClose(onClose)
+
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal theme-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal theme-dialog">
         <div className="modal-header">
           <span>🎨 Apparence</span>
           <button className="btn btn-icon" onClick={onClose} title="Fermer">
