@@ -1,4 +1,5 @@
 import { useReplayStore } from '../../stores/replayStore'
+import { useWatchStore } from '../../stores/watchStore'
 
 /** Couleur d'un step selon sa durée relative (neutre → chaud → rouge, via le thème). */
 function heatColor(durationMs: number | null, maxMs: number, isCatch: boolean): string {
@@ -13,6 +14,8 @@ function heatColor(durationMs: number | null, maxMs: number, isCatch: boolean): 
 
 export default function Timeline(): JSX.Element | null {
   const run = useReplayStore((s) => s.run)
+  const colorOf = useWatchStore((s) => s.colorOf)
+  useWatchStore((s) => s.marked) // re-rendu au changement de marquage
   const currentStep = useReplayStore((s) => s.currentStep)
   const { select, next, prev, first, last } = useReplayStore.getState()
 
@@ -65,11 +68,28 @@ export default function Timeline(): JSX.Element | null {
         </span>
       </div>
       <div className="steps-strip">
-        {run.steps.map((s) => (
+        {run.steps.map((s) => {
+          // Repère coloré si cette étape modifie une variable suivie : on
+          // localise d'un coup d'œil où une valeur a changé.
+          const touched = Object.keys(s.variables)
+            .map((n) => colorOf(n))
+            .filter((c): c is string => c !== null)
+          const changed = Object.entries(s.variables)
+            .map(([n, v]) => `${n} = ${v === null ? 'NULL' : String(v)}`)
+            .slice(0, 6)
+          return (
           <div
             key={s.stepIndex}
             className={`step-block${s.stepIndex === currentStep ? ' selected' : ''}`}
-            style={{ background: heatColor(s.durationMs, maxMs, s.kind === 'catch') }}
+            style={{
+              background: heatColor(s.durationMs, maxMs, s.kind === 'catch'),
+              boxShadow:
+                s.stepIndex === currentStep
+                  ? undefined
+                  : touched.length > 0
+                    ? `inset 0 -4px 0 0 ${touched[0]}`
+                    : undefined
+            }}
             title={[
               `Étape ${s.stepIndex + 1} sur ${run.steps.length} — ligne ${s.startLine}`,
               s.kind === 'catch'
@@ -84,13 +104,17 @@ export default function Timeline(): JSX.Element | null {
                         : ' (rapide)'
                   }`
                 : 'Durée non mesurée',
+              changed.length > 0 ? `\nVariables modifiées ici :\n  ${changed.join('\n  ')}` : '',
               '',
               "Cliquez pour revenir à ce moment : l'éditeur surligne la ligne et",
               'les variables reprennent leur valeur d’alors.'
-            ].join('\n')}
+            ]
+              .filter((l) => l !== null)
+              .join('\n')}
             onClick={() => select(s.stepIndex)}
           />
-        ))}
+          )
+        })}
       </div>
     </footer>
   )

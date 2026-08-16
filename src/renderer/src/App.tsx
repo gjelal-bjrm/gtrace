@@ -1233,9 +1233,8 @@ export default function App(): JSX.Element {
               </option>
             ))}
           </select>
-          <button className="btn btn-sm" onClick={() => setShowConnect(true)} title="Se connecter à un serveur">
-            🔌 Connecter
-          </button>
+          {/* Pas de bouton « Connecter » ici : il vit dans l'en-tête de
+              l'explorateur d'objets, à un seul endroit. */}
           <select
             className="db-picker"
             value={tabDatabase ?? ''}

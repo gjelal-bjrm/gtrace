@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
 import { formatSqlValue, useReplayStore, variablesAt } from '../../stores/replayStore'
+import { useWatchStore } from '../../stores/watchStore'
 
 export default function VariablesPanel({
   onOpenProcedure
@@ -9,12 +10,22 @@ export default function VariablesPanel({
 } = {}): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
+  const colorOf = useWatchStore((s) => s.colorOf)
+  const cycle = useWatchStore((s) => s.cycle)
+  useWatchStore((s) => s.marked) // re-rendu au changement de marquage
 
   if (!run) return <p className="hint">Exécuter d&apos;abord (▶) pour inspecter les variables.</p>
   if (run.steps.length === 0) return <p className="hint">Aucun step capturé.</p>
 
   const variables = variablesAt(run, currentStep)
   const step = run.steps[currentStep]
+  // Les variables suivies remontent en tête : on les garde sous les yeux même
+  // quand la procédure en déclare quarante.
+  const sorted = [...variables].sort((a, b) => {
+    const wa = colorOf(a.name) ? 0 : 1
+    const wb = colorOf(b.name) ? 0 : 1
+    return wa - wb || a.name.localeCompare(b.name)
+  })
 
   /*
    * Cas très déroutant : on lance « ma_procedure 123 » depuis un script. GTrace
@@ -68,27 +79,51 @@ export default function VariablesPanel({
       <table>
         <thead>
           <tr>
+            <th className="var-mark-col" title="Suivre une variable : elle passe en tête et ses étapes sont repérées dans la chronologie">
+              ★
+            </th>
             <th>Variable</th>
             <th>Valeur</th>
-            <th>Écrite au step</th>
+            <th>Écrite à l&apos;étape</th>
           </tr>
         </thead>
         <tbody>
-          {variables.map((v) => (
-            <tr key={v.name} className={v.changedNow ? 'var-changed' : ''}>
-              <td className="vars">{v.name}</td>
-              <td className="vars">
-                {formatSqlValue(v.value)}
-                {v.changedNow && v.hasPrevious && (
-                  <span className="var-previous"> ← {formatSqlValue(v.previous)}</span>
-                )}
-              </td>
-              <td>{v.changedAtStep}</td>
-            </tr>
-          ))}
+          {sorted.map((v) => {
+            const color = colorOf(v.name)
+            return (
+              <tr
+                key={v.name}
+                className={`${v.changedNow ? 'var-changed' : ''}${color ? ' var-watched' : ''}`}
+                style={color ? { borderLeft: `3px solid ${color}` } : undefined}
+              >
+                <td className="var-mark-col">
+                  <button
+                    className="var-mark"
+                    onClick={() => cycle(v.name)}
+                    title={
+                      color
+                        ? 'Changer de couleur, puis arrêter de suivre'
+                        : 'Suivre cette variable : repères colorés dans la chronologie'
+                    }
+                    style={color ? { color, opacity: 1 } : undefined}
+                  >
+                    {color ? '★' : '☆'}
+                  </button>
+                </td>
+                <td className="vars">{v.name}</td>
+                <td className="vars">
+                  {formatSqlValue(v.value)}
+                  {v.changedNow && v.hasPrevious && (
+                    <span className="var-previous"> ← {formatSqlValue(v.previous)}</span>
+                  )}
+                </td>
+                <td>{v.changedAtStep}</td>
+              </tr>
+            )
+          })}
           {variables.length === 0 && (
             <tr>
-              <td colSpan={3} className="hint">
+              <td colSpan={4} className="hint">
                 Aucune variable écrite jusqu&apos;ici.
               </td>
             </tr>
