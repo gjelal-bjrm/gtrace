@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.1.8",
+    "notes": [
+      "Débogue un script de déploiement complet (DROP / GO / CREATE / GRANT)",
+      "Suivre une variable d'une étape à l'autre + chronologie plus parlante",
+      "Corrige la corruption des caractères non-ASCII (cause des erreurs SQL)",
+      "Expliquer pourquoi un simple appel de procédure n'a pas de variables",
+      "Historique replié par défaut et renommé « Exécutions passées »",
+      "Aide intégrée : à quoi servent les boutons et les panneaux",
+      "Thèmes renommés sans référence externe + restauration plus fiable",
+      "Onglet vierge au premier lancement, plus de script de démo",
+      "Dialogues bloquants et fin des connexions en double",
+      "Panneau « Accès de l'IA » : cases à cocher au lieu de saisie libre",
+      "Refonte UX type SSMS : disposition, boutons explicites, thèmes"
+    ]
+  },
+  {
     "version": "0.1.6",
     "notes": [
       "Timeline : liseré de step non rogné (box-shadow inset au lieu d'outline)"

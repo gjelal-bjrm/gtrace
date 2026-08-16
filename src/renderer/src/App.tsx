@@ -147,6 +147,12 @@ export default function App(): JSX.Element {
   /** Saut ponctuel vers une ligne (fil d'Ariane) — prioritaire sur le replay. */
   const [jumpLine, setJumpLine] = useState<number | null>(null)
   const jumpToLine = useCallback((line: number) => setJumpLine(line), [])
+  // Le repli ne survit ni au changement d onglet ni a une nouvelle execution :
+  // du code masque herite donne l impression que le fichier est tronque ou
+  // que la saisie ne repond plus.
+  useEffect(() => {
+    setFoldDead(false)
+  }, [activeId])
   // Applique le thème enregistré au démarrage (variables CSS sur :root).
   useEffect(() => {
     useAppearanceStore.getState().init()
@@ -1439,7 +1445,9 @@ export default function App(): JSX.Element {
                           : "Masquer les branches jamais atteintes par cette exécution — ne reste que le chemin réellement pris"
                       }
                     >
-                      {foldDead ? '⊞ Tout afficher' : '⊟ Masquer le code non exécuté'}
+                      {foldDead
+                        ? `⊞ Tout afficher (${hiddenRanges.reduce((n, r) => n + (r.end - r.start + 1), 0)} lignes masquées)`
+                        : '⊟ Masquer le code non exécuté'}
                     </button>
                   </div>
                 )}
