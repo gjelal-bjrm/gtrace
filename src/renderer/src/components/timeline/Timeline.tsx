@@ -1,14 +1,14 @@
 import { useReplayStore } from '../../stores/replayStore'
 
-/** Couleur d'un step selon sa durée relative (neutre → ambre → rouge). */
+/** Couleur d'un step selon sa durée relative (neutre → chaud → rouge, via le thème). */
 function heatColor(durationMs: number | null, maxMs: number, isCatch: boolean): string {
   if (isCatch) return 'var(--error)'
-  if (durationMs === null || maxMs <= 0) return '#3a3f4a'
+  if (durationMs === null || maxMs <= 0) return 'var(--heat-0)'
   const ratio = Math.min(1, durationMs / maxMs)
-  if (ratio < 0.25) return '#3a3f4a'
-  if (ratio < 0.5) return '#8a6d2f'
-  if (ratio < 0.75) return '#c99a3a'
-  return '#d96c6c'
+  if (ratio < 0.25) return 'var(--heat-0)'
+  if (ratio < 0.5) return 'var(--heat-1)'
+  if (ratio < 0.75) return 'var(--heat-2)'
+  return 'var(--heat-3)'
 }
 
 export default function Timeline(): JSX.Element | null {

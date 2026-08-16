@@ -2,6 +2,8 @@ import * as monaco from 'monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { useEffect, useRef } from 'react'
 import { registerSqlCompletion } from './completion'
+import { useAppearanceStore } from '../../stores/appearanceStore'
+import { findTheme } from '../../theme/themes'
 
 self.MonacoEnvironment = {
   getWorker: () => new editorWorker()
@@ -23,6 +25,26 @@ monaco.editor.defineTheme('gtrace-dark', {
     'editorLineNumber.foreground': '#4a4f59',
     'editorLineNumber.activeForeground': '#8b909a',
     'editorGutter.background': '#14161a'
+  }
+})
+
+// Thème clair calé sur la coloration de l'éditeur SQL de SSMS :
+// mots-clés bleus, chaînes rouges, commentaires verts.
+monaco.editor.defineTheme('gtrace-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'keyword.sql', foreground: '0000ff' },
+    { token: 'string.sql', foreground: 'a31515' },
+    { token: 'comment.sql', foreground: '008000' },
+    { token: 'number.sql', foreground: '098658' }
+  ],
+  colors: {
+    'editor.background': '#ffffff',
+    'editor.lineHighlightBackground': '#f0f4f8',
+    'editorLineNumber.foreground': '#9aa4b0',
+    'editorLineNumber.activeForeground': '#3d4b59',
+    'editorGutter.background': '#ffffff'
   }
 })
 
@@ -118,13 +140,28 @@ export default function CodeEditor({
   onToggleBpRef.current = onToggleBreakpoint
   onSelectionRef.current = onSelectionChange
 
+  // L'éditeur suit le thème de l'application (clair/sombre) et la taille de
+  // police choisie dans le dialogue Apparence.
+  const monacoTheme = useAppearanceStore((s) =>
+    findTheme(s.appearance.themeId).base === 'light' ? 'gtrace-light' : 'gtrace-dark'
+  )
+  const editorFontSize = useAppearanceStore((s) => s.appearance.editorFontSize)
+
+  useEffect(() => {
+    monaco.editor.setTheme(monacoTheme)
+  }, [monacoTheme])
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize: editorFontSize })
+  }, [editorFontSize])
+
   useEffect(() => {
     const editor = monaco.editor.create(hostRef.current!, {
       value,
       language: 'sql',
-      theme: 'gtrace-dark',
+      theme: monacoTheme,
       fontFamily: "'JetBrains Mono', Consolas, 'Cascadia Mono', monospace",
-      fontSize: 13,
+      fontSize: editorFontSize,
       lineHeight: 20,
       minimap: { enabled: false },
       glyphMargin: true,

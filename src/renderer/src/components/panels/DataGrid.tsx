@@ -118,13 +118,19 @@ export default function DataGrid({
     return marked.length > 0 ? marked : shown.map((_, i) => i)
   }, [rowColor, shown])
 
+  /** Prochaine teinte de la rotation : deux lignes marquées à la suite diffèrent. */
+  const nextColorRef = useRef(0)
+
   const cycleRow = useCallback((i: number) => {
     setRowColor((prev) => {
       const next = new Map(prev)
-      const cur = next.get(i)
-      if (cur === undefined) next.set(i, 0)
-      else if (cur + 1 < PALETTE.length) next.set(i, cur + 1)
-      else next.delete(i)
+      if (next.has(i)) {
+        // Ligne déjà marquée : re-cliquer la remet à son état d'origine.
+        next.delete(i)
+      } else {
+        next.set(i, nextColorRef.current)
+        nextColorRef.current = (nextColorRef.current + 1) % PALETTE.length
+      }
       return next
     })
   }, [])

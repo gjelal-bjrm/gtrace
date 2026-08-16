@@ -29,6 +29,9 @@ import TabBar from './components/editor/TabBar'
 import Splitter from './components/layout/Splitter'
 import { Wordmark } from './components/layout/Logo'
 import UpdateBanner from './components/layout/UpdateBanner'
+import StatusBar from './components/layout/StatusBar'
+import ThemeDialog from './components/layout/ThemeDialog'
+import { useAppearanceStore } from './stores/appearanceStore'
 import WhatsNew from './components/layout/WhatsNew'
 import { useUpdateStore } from './stores/updateStore'
 import { setCompletionSchema } from './components/editor/completion'
@@ -129,18 +132,24 @@ export default function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('run')
   const [showExplorer, setShowExplorer] = useState(true)
   const [showConnect, setShowConnect] = useState(false)
-  /** Mode plein écran données : masque explorateur + éditeur, panneau en grand. */
+  /** Résultats agrandis : masque l'éditeur pour donner toute la place aux données. */
   const [focusMode, setFocusMode] = useState(false)
+  const [showTheme, setShowTheme] = useState(false)
+  // Applique le thème enregistré au démarrage (variables CSS sur :root).
+  useEffect(() => {
+    useAppearanceStore.getState().init()
+  }, [])
   // Tailles redimensionnables des zones (mémorisées entre sessions)
   const [explorerWidth, setExplorerWidth] = useState(() => loadSize('gtrace.explorerW', 288, 190, 640))
-  const [sidePanelWidth, setSidePanelWidth] = useState(() => loadSize('gtrace.sideW', 440, 320, 820))
+  /** Hauteur du panneau de résultats (en bas, disposition SSMS). */
+  const [resultsHeight, setResultsHeight] = useState(() => loadSize('gtrace.resultsH', 300, 140, 900))
   const [timelineHeight, setTimelineHeight] = useState(() => loadSize('gtrace.timelineH', 132, 96, 480))
   useEffect(() => {
     localStorage.setItem('gtrace.explorerW', String(explorerWidth))
   }, [explorerWidth])
   useEffect(() => {
-    localStorage.setItem('gtrace.sideW', String(sidePanelWidth))
-  }, [sidePanelWidth])
+    localStorage.setItem('gtrace.resultsH', String(resultsHeight))
+  }, [resultsHeight])
   useEffect(() => {
     localStorage.setItem('gtrace.timelineH', String(timelineHeight))
   }, [timelineHeight])
@@ -249,9 +258,14 @@ export default function App(): JSX.Element {
 
   // Sélection courante dans l'éditeur + SQL réellement exécuté (sélection ou tout).
   const selectionRef = useRef<{ text: string; startLine: number; startColumn: number } | null>(null)
+  /** Nb de lignes sélectionnées (0 = aucune) — sert à l'affichage du bouton Exécuter. */
+  const [selectionLines, setSelectionLines] = useState(0)
   const onEditorSelection = useCallback(
     (sel: { text: string; startLine: number; startColumn: number } | null) => {
       selectionRef.current = sel
+      const lines = sel ? sel.text.split('\n').length : 0
+      // setState seulement si la valeur change (évite les rendus à chaque frappe).
+      setSelectionLines((cur) => (cur === lines ? cur : lines))
     },
     []
   )
@@ -910,6 +924,18 @@ export default function App(): JSX.Element {
     }
   }, [activeRef, getExecutionSql, compatLevel, paramValues, timeoutMin, confirmProduction])
 
+  // F5 / Ctrl+Entrée : exécuter (raccourcis SSMS). Ignoré si une session tourne.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) {
+        e.preventDefault()
+        if (!busy && !locked) void execute()
+      }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [execute, busy, locked])
+
   /** Rejouer une session passée sans réexécuter (historique) : onglet virtuel + replay. */
   const onLoadHistory = useCallback(
     (entry: HistoryEntry) => {
@@ -1027,6 +1053,13 @@ export default function App(): JSX.Element {
             v{appVersion || '…'}
           </button>
           <button
+            className="btn btn-ghost"
+            onClick={() => setShowTheme(true)}
+            title="Apparence : thèmes (dont SSMS clair), taille du texte, densité"
+          >
+            🎨 Thème
+          </button>
+          <button
             className="btn btn-icon"
             onClick={() => useUpdateStore.getState().check()}
             title="Vérifier les mises à jour"
@@ -1043,6 +1076,7 @@ export default function App(): JSX.Element {
       {whatsNewSince !== null && (
         <WhatsNew since={whatsNewSince} onClose={() => setWhatsNewSince(null)} />
       )}
+      {showTheme && <ThemeDialog onClose={() => setShowTheme(false)} />}
       {showAiActivity && (
         <AiActivityPanel activeConnection={activeConn} onClose={() => setShowAiActivity(false)} />
       )}
@@ -1138,8 +1172,13 @@ export default function App(): JSX.Element {
               <option value={140}>SQL 2017</option>
               <option value={130}>SQL 2016</option>
             </select>
-            <button className="btn" onClick={analyze} disabled={busy} title="Analyser sans exécuter">
-              {busy ? '…' : 'Analyser'}
+            <button
+              className="btn"
+              onClick={analyze}
+              disabled={busy}
+              title="Vérifie la syntaxe et liste les statements et paramètres — SANS rien exécuter sur le serveur."
+            >
+              {busy ? '…' : '🔍 Analyser'}
             </button>
             {xe ? (
               <button className="btn btn-danger" onClick={() => void window.gtrace.xeStop(xe.id)}>
@@ -1150,17 +1189,30 @@ export default function App(): JSX.Element {
                 className="btn"
                 onClick={startProfiling}
                 disabled={!canRun}
-                title="Profilage passif Extended Events (exécution NON instrumentée)"
+                title="Exécute tel quel et mesure le temps passé sur chaque ligne, pour trouver les lenteurs (Extended Events, sans instrumentation)."
               >
                 ⚡ Profiler
               </button>
             )}
-            <button className="btn btn-primary btn-run" onClick={execute} disabled={!canRun}>
+            <button
+              className="btn btn-primary btn-run"
+              onClick={execute}
+              disabled={!canRun}
+              title={
+                breakpoints.size > 0
+                  ? `Exécute pas à pas en s'arrêtant sur ${breakpoints.size} breakpoint(s) (F5)`
+                  : selectionLines > 0
+                    ? 'Exécute UNIQUEMENT le texte sélectionné (F5)'
+                    : "Exécute tout le contenu de l'onglet (F5). Sélectionnez du texte pour n'exécuter que celui-ci."
+              }
+            >
               {busy
                 ? 'Exécution…'
                 : breakpoints.size > 0
                   ? `▶ Déboguer (${breakpoints.size})`
-                  : '▶ Exécuter'}
+                  : selectionLines > 0
+                    ? '▶ Exécuter la sélection'
+                    : '▶ Exécuter'}
             </button>
           </div>
         )}
@@ -1199,8 +1251,8 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      <main className={`workspace${focusMode ? ' focus-mode' : ''}`}>
-        {!focusMode && showExplorer && (
+      <main className="workspace">
+        {showExplorer && (
           <>
             <aside className="explorer-pane" style={{ width: explorerWidth }}>
               <ObjectExplorer
@@ -1221,45 +1273,43 @@ export default function App(): JSX.Element {
             />
           </>
         )}
-        {!focusMode && (
-          <>
-            <section className="editor-pane">
-              <TabBar
-                locked={locked}
-                onSwitch={switchToTab}
-                onClose={doCloseTab}
-                onNew={doNew}
-                onOpen={() => void doOpen()}
-                onSave={() => void doSave(false)}
-                onSaveAs={() => void doSave(true)}
-              />
-              <div className="editor-body">
-                <CodeEditor
-                  value={sql}
-                  onChange={onSqlChange}
-                  decorations={decorations}
-                  revealLine={revealLine}
-                  breakpoints={breakpoints}
-                  onToggleBreakpoint={toggleBreakpoint}
-                  onSelectionChange={onEditorSelection}
+
+        {/* Colonne principale, disposition SSMS : éditeur en haut, résultats en
+            bas sur toute la largeur (tables larges lisibles sans scroll latéral). */}
+        <section className="main-area">
+          {!focusMode && (
+            <>
+              <section className="editor-pane">
+                <TabBar
+                  locked={locked}
+                  onSwitch={switchToTab}
+                  onClose={doCloseTab}
+                  onNew={doNew}
+                  onOpen={() => void doOpen()}
+                  onSave={() => void doSave(false)}
+                  onSaveAs={() => void doSave(true)}
                 />
-              </div>
-            </section>
+                <div className="editor-body">
+                  <CodeEditor
+                    value={sql}
+                    onChange={onSqlChange}
+                    decorations={decorations}
+                    revealLine={revealLine}
+                    breakpoints={breakpoints}
+                    onToggleBreakpoint={toggleBreakpoint}
+                    onSelectionChange={onEditorSelection}
+                  />
+                </div>
+              </section>
 
-            <Splitter axis="x" onDrag={(d) => setSidePanelWidth((w) => clamp(w - d, 320, 820))} />
-          </>
-        )}
-
-        <aside className="side-panel" style={focusMode ? undefined : { width: sidePanelWidth }}>
-          {focusMode && (
-            <button
-              className="focus-exit"
-              onClick={() => setFocusMode(false)}
-              title="Quitter le plein écran données (Échap)"
-            >
-              ⤡ Quitter le plein écran
-            </button>
+              <Splitter axis="y" onDrag={(d) => setResultsHeight((h) => clamp(h - d, 140, 900))} />
+            </>
           )}
+
+          <section
+            className={`results-pane${focusMode ? ' maximized' : ''}`}
+            style={focusMode ? undefined : { height: resultsHeight }}
+          >
           <nav className="tabs">
             <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')}>
               Exécution
@@ -1290,11 +1340,11 @@ export default function App(): JSX.Element {
               onClick={() => setFocusMode((f) => !f)}
               title={
                 focusMode
-                  ? 'Quitter le plein écran données'
-                  : 'Afficher les données en plein écran (masque éditeur + explorateur)'
+                  ? "Réafficher l'éditeur SQL (Échap)"
+                  : "Agrandir les résultats en masquant l'éditeur"
               }
             >
-              {focusMode ? '⤡ Réduire' : '⤢ Plein écran'}
+              {focusMode ? '⤡ Réafficher l’éditeur' : '⤢ Agrandir'}
             </button>
           </nav>
           <div className="tab-content">
@@ -1332,7 +1382,8 @@ export default function App(): JSX.Element {
               />
             )}
           </div>
-        </aside>
+          </section>
+        </section>
       </main>
 
       {run && (
@@ -1343,6 +1394,15 @@ export default function App(): JSX.Element {
           </div>
         </>
       )}
+
+      <StatusBar
+        connection={activeConn}
+        database={activeRef?.database ?? activeConn?.defaultDatabase ?? null}
+        run={run}
+        busy={busy}
+        sessionStatus={session?.status ?? null}
+        selectionLines={selectionLines}
+      />
     </div>
   )
 }

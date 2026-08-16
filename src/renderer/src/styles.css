@@ -16,6 +16,16 @@
   --ok: #7dbb7d;
   --mono: 'JetBrains Mono', Consolas, 'Cascadia Mono', monospace;
   --ui: 'Segoe UI', system-ui, sans-serif;
+  /* Valeurs de repli : surchargées par le thème actif (theme/applyTheme.ts). */
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --zebra: rgba(255, 255, 255, 0.022);
+  --heat-0: #3a3f4a;
+  --heat-1: #8a6d2f;
+  --heat-2: #c99a3a;
+  --heat-3: #d96c6c;
+  --ui-font-size: 13px;
+  --row-pad: 5px;
 }
 
 * {
@@ -34,7 +44,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   overflow: hidden;
 }
 
@@ -87,7 +97,7 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: rgba(217, 164, 65, 0.24);
+  background: var(--accent-dim);
 }
 
 .btn-run {
@@ -466,7 +476,7 @@ button:disabled {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -482,7 +492,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 40px var(--shadow);
 }
 
 .modal-header {
@@ -897,7 +907,6 @@ button:disabled {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--border);
 }
 
 .editor-body {
@@ -1035,42 +1044,32 @@ button:disabled {
 
 /* ─── Panneau droit à onglets ────────────────────────────────────────────── */
 
-.side-panel {
+/* Colonne principale (disposition SSMS) : éditeur au-dessus, résultats dessous. */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  /* min-width:0 indispensable : sans lui, une table large étire la colonne
+     au-delà de la fenêtre (body overflow:hidden) → plus de scroll possible. */
+  min-width: 0;
+  min-height: 0;
+}
+
+.results-pane {
   position: relative;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  /* min-width:0 indispensable : sans lui, une table large étire le panneau
-     au-delà de la fenêtre (body overflow:hidden) → plus de scroll ni de bouton. */
   min-width: 0;
   min-height: 0;
   background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
-/* Mode plein écran données : le panneau prend toute la largeur disponible. */
-.workspace.focus-mode .side-panel {
+/* Résultats agrandis : occupent toute la colonne (l'éditeur est masqué). */
+.results-pane.maximized {
   flex: 1 1 auto;
-  width: auto !important;
-}
-
-/* Bouton flottant de sortie du plein écran (toujours atteignable). */
-.focus-exit {
-  position: absolute;
-  top: 6px;
-  right: 12px;
-  z-index: 40;
-  padding: 5px 12px;
-  font-size: 12px;
-  border-radius: 6px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-}
-
-.focus-exit:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  height: auto !important;
 }
 
 .tabs {
@@ -1246,7 +1245,7 @@ th {
 }
 
 .row-added td {
-  background: rgba(125, 187, 125, 0.14);
+  background: color-mix(in srgb, var(--ok) 24%, transparent);
 }
 
 .row-removed td {
@@ -1263,10 +1262,36 @@ th {
 
 .grid-scroll {
   overflow: auto;
-  max-height: 62vh;
   border: 1px solid var(--border);
   border-radius: 5px;
   background: var(--bg-input);
+}
+
+/* Dans le panneau du bas, la grille remplit la hauteur disponible : l'en-tête
+   figé reste utile car c'est bien .grid-scroll qui défile (et non le panneau). */
+.results-pane .tab-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.results-pane .tables {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.results-pane .resultset,
+.results-pane .grid-block {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.results-pane .grid-scroll {
+  flex: 1 1 auto;
+  min-height: 120px;
 }
 
 /* Largeur intrinsèque : les colonnes ne sont pas compressées, on défile. */
@@ -1294,7 +1319,7 @@ th {
 }
 
 .data-grid td {
-  padding: 4px 10px;
+  padding: var(--row-pad) 10px;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
   white-space: nowrap;
@@ -1306,7 +1331,7 @@ th {
 
 /* Zébrage discret (désactivé pour les snapshots qui colorent le diff). */
 .data-grid:not(.snap-grid) tbody tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--zebra);
 }
 
 .data-grid tbody tr:hover td {
@@ -1379,7 +1404,7 @@ th {
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
   border-radius: 7px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 28px var(--shadow);
   font-size: 12px;
 }
 
@@ -1626,6 +1651,171 @@ th {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* ─── Dialogue Apparence / thèmes ────────────────────────────────────────── */
+
+.theme-dialog {
+  width: min(680px, 94vw);
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.theme-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.theme-card.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.theme-preview {
+  display: block;
+  height: 74px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.theme-preview-bar {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+}
+
+.theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.theme-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+.theme-line {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.theme-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.theme-tagline {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.theme-settings {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.theme-settings input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.theme-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 44px;
+  text-align: right;
+}
+
+.theme-actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Barre d'état (bas de fenêtre, façon SSMS) ──────────────────────────── */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.status-state {
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 3px;
+}
+
+.status-state.ok {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+}
+
+.status-state.busy {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.status-state.err {
+  color: var(--error);
+  background: var(--error-dim);
+}
+
+.status-item {
+  white-space: nowrap;
+}
+
+.status-item.accent {
+  color: var(--accent);
+}
+
+.status-item.prod {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.status-item.dimmed {
+  opacity: 0.75;
+}
+
+.status-spacer {
+  flex: 1;
+}
+
 /* ─── Décorations Monaco ─────────────────────────────────────────────────── */
 
 .dec-current {
@@ -1665,23 +1855,23 @@ th {
 }
 
 .dec-heat1 {
-  background: rgba(217, 164, 65, 0.06);
+  background: color-mix(in srgb, var(--heat-1) 22%, transparent);
 }
 
 .dec-heat2 {
-  background: rgba(217, 164, 65, 0.14);
+  background: color-mix(in srgb, var(--heat-1) 40%, transparent);
 }
 
 .dec-heat3 {
-  background: rgba(217, 130, 65, 0.22);
+  background: color-mix(in srgb, var(--heat-2) 45%, transparent);
 }
 
 .dec-heat4 {
-  background: rgba(217, 108, 108, 0.3);
+  background: color-mix(in srgb, var(--heat-3) 48%, transparent);
 }
 
 .dec-breakpoint::before {
   content: '●';
-  color: #d9534f;
+  color: var(--error);
   font-size: 12px;
 }
