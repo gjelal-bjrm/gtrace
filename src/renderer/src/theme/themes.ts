@@ -17,9 +17,9 @@ export interface ThemeDef {
 
 export const THEMES: ThemeDef[] = [
   {
-    id: 'ssms-light',
-    label: 'SSMS clair',
-    tagline: 'Les couleurs de SQL Server Management Studio',
+    id: 'azur',
+    label: 'Azur clair',
+    tagline: 'Fond clair, accents bleus — le classique des éditeurs SQL',
     base: 'light',
     vars: {
       bg: '#f3f3f3',
@@ -47,8 +47,8 @@ export const THEMES: ThemeDef[] = [
     }
   },
   {
-    id: 'gtrace-dark',
-    label: 'GTrace sombre',
+    id: 'ambre',
+    label: 'Ambre sombre',
     tagline: 'Ambre sur anthracite — l’identité GTrace',
     base: 'dark',
     vars: {
@@ -77,9 +77,9 @@ export const THEMES: ThemeDef[] = [
     }
   },
   {
-    id: 'vs-dark',
-    label: 'Visual Studio sombre',
-    tagline: 'Le bleu de VS Code sur gris profond',
+    id: 'ardoise',
+    label: 'Ardoise',
+    tagline: 'Gris profond et bleu vif, contraste doux',
     base: 'dark',
     vars: {
       bg: '#1e1e1e',
@@ -107,9 +107,9 @@ export const THEMES: ThemeDef[] = [
     }
   },
   {
-    id: 'ssms-dark',
-    label: 'SSMS sombre',
-    tagline: 'La palette SSMS en version nuit',
+    id: 'cobalt',
+    label: 'Cobalt',
+    tagline: 'Nuit bleutée, accents cobalt',
     base: 'dark',
     vars: {
       bg: '#1b1b1c',
@@ -168,7 +168,7 @@ export const THEMES: ThemeDef[] = [
   }
 ]
 
-export const DEFAULT_THEME_ID = 'ssms-light'
+export const DEFAULT_THEME_ID = 'azur'
 
 export function findTheme(id: string): ThemeDef {
   return THEMES.find((t) => t.id === id) ?? THEMES.find((t) => t.id === DEFAULT_THEME_ID)!

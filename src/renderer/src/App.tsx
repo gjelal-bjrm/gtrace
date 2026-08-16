@@ -440,6 +440,19 @@ export default function App(): JSX.Element {
           })
         )
         if (!cancelled) useEditorStore.getState().restore(tabs, ws.activeTabId)
+      } else if (ws.tabs.length > 0 && !pristine) {
+        // On ne détruit jamais un travail commencé, mais on le dit : sans ça,
+        // l'utilisateur croit avoir perdu ses fichiers alors qu'ils sont intacts.
+        setNotice('Onglets précédents non restaurés : vous aviez déjà commencé à écrire.')
+      }
+
+      // Une connexion restaurée mais rattachée à aucun onglet donnait une barre
+      // d'outils « non connecté » — on croit la connexion perdue alors qu'elle
+      // est bien là. Quand il n'y en a qu'une, on rattache l'onglet actif.
+      if (!cancelled && conns.length === 1) {
+        const st = useEditorStore.getState()
+        const act = st.tabs.find((t) => t.id === st.activeId)
+        if (act && !act.connectionId) st.patchActive({ connectionId: conns[0].id })
       }
     }
     void restore().finally(() => {
@@ -1063,7 +1076,7 @@ export default function App(): JSX.Element {
           <button
             className="btn btn-ghost"
             onClick={() => setShowTheme(true)}
-            title="Apparence : thèmes (dont SSMS clair), taille du texte, densité"
+            title="Apparence : thèmes, taille du texte, densité des tableaux"
           >
             🎨 Thème
           </button>

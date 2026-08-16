@@ -12,7 +12,7 @@ export interface Appearance {
 }
 
 export const DEFAULT_APPEARANCE: Appearance = {
-  themeId: 'ssms-light',
+  themeId: 'azur',
   fontSize: 13,
   editorFontSize: 13,
   density: 'confortable'

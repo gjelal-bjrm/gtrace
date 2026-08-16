@@ -5,7 +5,7 @@ import { useEscapeClose } from '../../lib/useEscapeClose'
 
 /**
  * Dialogue « Apparence » : choix du thème parmi des palettes prédéfinies
- * (dont « SSMS clair »), plus les réglages de confort de lecture.
+ * plus les réglages de confort de lecture.
  * L'aperçu de chaque thème est dessiné avec ses propres couleurs.
  */
 export default function ThemeDialog({ onClose }: { onClose: () => void }): JSX.Element {

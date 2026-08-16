@@ -28,7 +28,7 @@ monaco.editor.defineTheme('gtrace-dark', {
   }
 })
 
-// Thème clair calé sur la coloration de l'éditeur SQL de SSMS :
+// Thème clair : coloration SQL classique —
 // mots-clés bleus, chaînes rouges, commentaires verts.
 monaco.editor.defineTheme('gtrace-light', {
   base: 'vs',
