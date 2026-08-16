@@ -30,40 +30,6 @@ export interface EditorTab {
   roWhitelist: string
 }
 
-const SAMPLE_SQL = `CREATE PROCEDURE dbo.DemoGTrace
-  @Facteur int,
-  @Total decimal(18,2) OUTPUT
-AS
-BEGIN
-  SET NOCOUNT ON;
-  DECLARE @i int = 0;
-  CREATE TABLE #tmp (Id int, Val decimal(18,2));
-
-  WHILE @i < 3
-  BEGIN
-    SET @i = @i + 1;
-    INSERT INTO #tmp VALUES (@i, @i * @Facteur);
-  END
-
-  SELECT @Total = SUM(Val) FROM #tmp;
-
-  BEGIN TRANSACTION;
-  UPDATE #tmp SET Val = 0;
-  ROLLBACK; -- les traces survivent au rollback
-
-  SELECT Id, Val FROM #tmp ORDER BY Id;
-
-  BEGIN TRY
-    IF @Total > 50
-      RAISERROR('Total trop élevé', 16, 1);
-  END TRY
-  BEGIN CATCH
-    SET @i = -1;
-  END CATCH
-
-  RETURN 42;
-END`
-
 let untitledCounter = 0
 function nextUntitled(): string {
   untitledCounter += 1
@@ -116,7 +82,9 @@ interface EditorState {
   restore: (tabs: EditorTab[], activeId: string | null) => void
 }
 
-const first = makeTab({ title: 'Démo', content: SAMPLE_SQL })
+// Au premier lancement : un onglet vierge « sans titre 1 », jamais de script
+// de démonstration (l'espace de travail enregistré prend le relais ensuite).
+const first = makeTab()
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   tabs: [first],
