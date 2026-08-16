@@ -20,6 +20,7 @@ import RunPanel from './components/panels/RunPanel'
 import InspectPanel from './components/panels/InspectPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import SnapshotsPanel from './components/panels/SnapshotsPanel'
+import CodePeek from './components/panels/CodePeek'
 import ObjectExplorer, { type OpenScript } from './components/connections/ObjectExplorer'
 import HistoryPanel from './components/connections/HistoryPanel'
 import ConnectDialog from './components/connections/ConnectDialog'
@@ -29,6 +30,7 @@ import TabBar from './components/editor/TabBar'
 import Breadcrumb from './components/editor/Breadcrumb'
 import { breadcrumbFor, deadRanges, executedStatements } from './lib/executionPath'
 import { mapArgsToParams, parseProcCall } from './lib/procCall'
+import { isolateProcedureBatch } from './lib/sqlBatches'
 import Splitter from './components/layout/Splitter'
 import { Wordmark } from './components/layout/Logo'
 import UpdateBanner from './components/layout/UpdateBanner'
@@ -800,7 +802,8 @@ export default function App(): JSX.Element {
       setError(null)
       setRun(null)
       try {
-        const result = await window.gtrace.instrument(text, useEditorStore.getState().active().compatLevel)
+        const prepared = isolateProcedureBatch(text)
+        const result = await window.gtrace.instrument(prepared.sql, useEditorStore.getState().active().compatLevel)
         setInstr(result)
         setTab('run')
         setStatus((s) => (s ? { ...s, running: true } : s))
@@ -834,8 +837,16 @@ export default function App(): JSX.Element {
     }
     if (!confirmProduction()) return
     // SQL à exécuter : sélection (rembourrée) sinon tout le contenu (comportement SSMS).
-    const execSql = getExecutionSql()
+    const prepared = isolateProcedureBatch(getExecutionSql())
+    const execSql = prepared.sql
     execSqlRef.current = execSql
+    if (prepared.isolated) {
+      setNotice(
+        prepared.procedureName
+          ? `Script de déploiement détecté : seule ${prepared.procedureName} est instrumentée (blocs DROP/GRANT ignorés).`
+          : 'Séparateurs GO neutralisés pour permettre une exécution en un seul lot.'
+      )
+    }
     setBusy(true)
     setError(null)
     try {
@@ -1454,6 +1465,11 @@ export default function App(): JSX.Element {
             className={`results-pane${focusMode ? ' maximized' : ''}`}
             style={focusMode ? undefined : { height: resultsHeight }}
           >
+            {/* Éditeur masqué : on garde un repère sur l'endroit du code où
+                l'on se trouve, sinon naviguer dans la chronologie devient aveugle. */}
+            {focusMode && revealLine !== null && revealLine > 0 && (
+              <CodePeek sql={sql} line={revealLine} />
+            )}
           <nav className="tabs">
             <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')} title="Paramètres de la procédure, options et export — le point de départ avant de lancer">
               Exécution
