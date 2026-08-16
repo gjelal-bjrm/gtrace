@@ -41,9 +41,27 @@ export default function Timeline(): JSX.Element | null {
           ⏭
         </button>
         <span className="step-label">
-          step {currentStep + 1}/{run.steps.length} — ligne {current.startLine} — {currentType}
+          étape {currentStep + 1}/{run.steps.length} — ligne {current.startLine} — {currentType}
           {current.durationMs !== null ? ` — ${current.durationMs} ms` : ''}
-          {current.rowCount !== null && current.rowCount >= 0 ? ` — ${current.rowCount} row(s)` : ''}
+          {current.rowCount !== null && current.rowCount >= 0 ? ` — ${current.rowCount} ligne(s)` : ''}
+        </span>
+
+        <span className="spacer" />
+
+        {/* Sans légende, la bande colorée reste une énigme : on dit ce qu'elle
+            représente et ce que veut dire chaque teinte. */}
+        <span className="timeline-legend">
+          <span className="legend-label">chaque case = une instruction exécutée · cliquez pour y revenir</span>
+          <span className="legend-scale" title="Couleur selon le temps passé sur l'instruction">
+            <i style={{ background: 'var(--heat-0)' }} />
+            <i style={{ background: 'var(--heat-1)' }} />
+            <i style={{ background: 'var(--heat-2)' }} />
+            <i style={{ background: 'var(--heat-3)' }} />
+            <span className="legend-ends">rapide → lent</span>
+          </span>
+          <span className="legend-err" title="Instruction ayant levé une erreur (bloc CATCH)">
+            <i style={{ background: 'var(--error)' }} /> erreur
+          </span>
         </span>
       </div>
       <div className="steps-strip">
@@ -52,11 +70,24 @@ export default function Timeline(): JSX.Element | null {
             key={s.stepIndex}
             className={`step-block${s.stepIndex === currentStep ? ' selected' : ''}`}
             style={{ background: heatColor(s.durationMs, maxMs, s.kind === 'catch') }}
-            title={`#${s.stepIndex} — ligne ${s.startLine} — ${
+            title={[
+              `Étape ${s.stepIndex + 1} sur ${run.steps.length} — ligne ${s.startLine}`,
               s.kind === 'catch'
-                ? `CATCH : ${s.error?.message ?? ''}`
-                : (run.instrument.statements[s.statementIndex]?.type ?? '')
-            }${s.durationMs !== null ? ` (${s.durationMs} ms)` : ''}`}
+                ? `⚠ Erreur interceptée : ${s.error?.message ?? ''}`
+                : (run.instrument.statements[s.statementIndex]?.type ?? ''),
+              s.durationMs !== null
+                ? `Durée : ${s.durationMs} ms${
+                    s.durationMs >= maxMs * 0.75
+                      ? ' (parmi les plus lentes)'
+                      : s.durationMs >= maxMs * 0.25
+                        ? ' (moyenne)'
+                        : ' (rapide)'
+                  }`
+                : 'Durée non mesurée',
+              '',
+              "Cliquez pour revenir à ce moment : l'éditeur surligne la ligne et",
+              'les variables reprennent leur valeur d’alors.'
+            ].join('\n')}
             onClick={() => select(s.stepIndex)}
           />
         ))}

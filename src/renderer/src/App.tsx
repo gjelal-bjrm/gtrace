@@ -26,6 +26,9 @@ import ConnectDialog from './components/connections/ConnectDialog'
 import AiActivityPanel from './components/panels/AiActivityPanel'
 import DiagnosisModal from './components/panels/DiagnosisModal'
 import TabBar from './components/editor/TabBar'
+import Breadcrumb from './components/editor/Breadcrumb'
+import { breadcrumbFor, deadRanges, executedStatements } from './lib/executionPath'
+import { mapArgsToParams, parseProcCall } from './lib/procCall'
 import Splitter from './components/layout/Splitter'
 import { Wordmark } from './components/layout/Logo'
 import UpdateBanner from './components/layout/UpdateBanner'
@@ -137,6 +140,11 @@ export default function App(): JSX.Element {
   const [focusMode, setFocusMode] = useState(false)
   const [showTheme, setShowTheme] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  /** Replie les branches jamais atteintes par la derniere execution. */
+  const [foldDead, setFoldDead] = useState(false)
+  /** Saut ponctuel vers une ligne (fil d'Ariane) — prioritaire sur le replay. */
+  const [jumpLine, setJumpLine] = useState<number | null>(null)
+  const jumpToLine = useCallback((line: number) => setJumpLine(line), [])
   // Applique le thème enregistré au démarrage (variables CSS sur :root).
   useEffect(() => {
     useAppearanceStore.getState().init()
@@ -980,6 +988,61 @@ export default function App(): JSX.Element {
     st.patchActive({ breakpoints: next })
   }, [])
 
+  /**
+   * L'utilisateur a lancé « ma_procedure 1374 » : on va chercher le corps de la
+   * procédure en base, on l'ouvre dans un onglet et on reprend les arguments de
+   * l'appel comme valeurs de paramètres. Évite de refaire à la main le chemin
+   * explorateur → Procédures stockées → 🐞 → ressaisir les paramètres.
+   */
+  const openCalledProcedure = useCallback(async () => {
+    if (!activeRef) return
+    const call = parseProcCall(execSqlRef.current ?? sqlRef.current)
+    if (!call) {
+      setError('Impossible de reconnaître un appel de procédure dans ce script.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const procs = await window.gtrace.listProcs(activeRef)
+      const wanted = call.name.toLowerCase()
+      const found =
+        procs.find((p) => `${p.schema}.${p.name}`.toLowerCase() === wanted) ??
+        procs.find((p) => p.name.toLowerCase() === wanted) ??
+        procs.find((p) => p.name.toLowerCase() === wanted.split('.').pop())
+      if (!found) {
+        setError(`Procédure « ${call.name} » introuvable sur ${activeConn?.label ?? 'cette base'}.`)
+        return
+      }
+      const src = await window.gtrace.loadProc(activeRef, found.objectId)
+      useEditorStore
+        .getState()
+        .openVirtual(`${src.schema}.${src.name}`, src.definition, tabDatabase, activeTab.connectionId)
+      resetDerived()
+
+      // Analyse immédiate : donne les paramètres, qu'on pré-remplit avec les
+      // arguments de l'appel d'origine.
+      const analysis = await window.gtrace.instrument(src.definition, compatLevel)
+      setInstr(analysis)
+      if (analysis.parameters.length > 0 && call.args.length > 0) {
+        const values = mapArgsToParams(call.args, analysis.parameters)
+        if (Object.keys(values).length > 0) {
+          useEditorStore.getState().patchActive({ paramValues: values })
+          setNotice(
+            `${src.schema}.${src.name} ouverte — paramètres repris de votre appel. Posez un point d'arrêt dans la marge, puis ▶ Déboguer.`
+          )
+        }
+      } else {
+        setNotice(`${src.schema}.${src.name} ouverte.`)
+      }
+      setTab('run')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }, [activeRef, activeConn, activeTab.connectionId, tabDatabase, compatLevel, resetDerived])
+
   const decorations = useMemo<LineDecoration[]>(() => {
     const decs: LineDecoration[] = []
     if (instr) {
@@ -998,6 +1061,16 @@ export default function App(): JSX.Element {
       }
     }
     if (run) {
+      // Marge colorée : ce qui a réellement tourné. Sur une longue procédure,
+      // c'est ce qui distingue d'un coup d'œil le chemin pris du code mort.
+      if (instr) {
+        const done = executedStatements(run)
+        for (const s of instr.statements) {
+          if (s.kind === 'statement' && done.has(s.index)) {
+            decs.push({ kind: 'executed', startLine: s.startLine, endLine: s.endLine })
+          }
+        }
+      }
       for (const e of run.errors) {
         if (e.line !== null) {
           decs.push({ kind: 'error', startLine: e.line, endLine: e.line, message: `Erreur ${e.number} : ${e.message}` })
@@ -1040,13 +1113,36 @@ export default function App(): JSX.Element {
     return decs
   }, [instr, run, currentStep, session, xe, xeResult])
 
+  // Reprendre le replay annule le saut : la ligne courante redevient maîtresse.
+  useEffect(() => {
+    setJumpLine(null)
+  }, [currentStep, session?.status])
+
   const revealLine =
+    jumpLine ??
     xe?.currentLine ??
     (session?.status === 'paused' && session.paused
       ? session.paused.startLine
       : (run?.steps[currentStep]?.startLine ?? null))
 
   const canRun = activeRef !== null && !busy && !locked
+
+  /** Branches jamais atteintes, repliables à la demande (procédures longues). */
+  const hiddenRanges = useMemo(
+    () => (foldDead && run && instr ? deadRanges(instr.statements, run) : []),
+    [foldDead, run, instr]
+  )
+
+  /** Imbrications autour de la ligne courante du replay (fil d'Ariane). */
+  const crumbs = useMemo(() => {
+    if (!instr) return []
+    const line =
+      session?.status === 'paused' && session.paused
+        ? session.paused.startLine
+        : (run?.steps[currentStep]?.startLine ?? 0)
+    return line > 0 ? breadcrumbFor(instr.statements, line) : []
+  }, [instr, run, currentStep, session])
+
 
   return (
     <div className="app">
@@ -1320,6 +1416,23 @@ export default function App(): JSX.Element {
                   onSave={() => void doSave(false)}
                   onSaveAs={() => void doSave(true)}
                 />
+                {run && (
+                  <div className="editor-strip">
+                    <Breadcrumb crumbs={crumbs} onJump={jumpToLine} />
+                    <span className="spacer" />
+                    <button
+                      className={`btn btn-sm fold-toggle${foldDead ? ' active' : ''}`}
+                      onClick={() => setFoldDead((v) => !v)}
+                      title={
+                        foldDead
+                          ? 'Réafficher tout le code'
+                          : "Masquer les branches jamais atteintes par cette exécution — ne reste que le chemin réellement pris"
+                      }
+                    >
+                      {foldDead ? '⊞ Tout afficher' : '⊟ Masquer le code non exécuté'}
+                    </button>
+                  </div>
+                )}
                 <div className="editor-body">
                   <CodeEditor
                     value={sql}
@@ -1328,6 +1441,7 @@ export default function App(): JSX.Element {
                     revealLine={revealLine}
                     breakpoints={breakpoints}
                     onToggleBreakpoint={toggleBreakpoint}
+                    hiddenRanges={hiddenRanges}
                     onSelectionChange={onEditorSelection}
                   />
                 </div>
@@ -1394,7 +1508,9 @@ export default function App(): JSX.Element {
                 onDiagnose={() => setShowDiagnosis(true)}
               />
             )}
-            {tab === 'variables' && <VariablesPanel />}
+            {tab === 'variables' && (
+              <VariablesPanel onOpenProcedure={() => void openCalledProcedure()} />
+            )}
             {tab === 'results' && <ResultsPanel />}
             {tab === 'data' && <SnapshotsPanel />}
             {tab === 'inspect' && (

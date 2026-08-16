@@ -57,6 +57,7 @@ export type DecorationKind =
   | 'heat2'
   | 'heat3'
   | 'heat4'
+  | 'executed'
 
 export interface LineDecoration {
   kind: DecorationKind
@@ -95,6 +96,12 @@ function optionsFor(dec: LineDecoration): monaco.editor.IModelDecorationOptions 
         glyphMarginClassName: 'dec-error-glyph',
         glyphMarginHoverMessage: hover
       }
+    case 'executed':
+      return {
+        isWholeLine: true,
+        linesDecorationsClassName: 'dec-executed',
+        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+      }
     case 'heat1':
     case 'heat2':
     case 'heat3':
@@ -115,6 +122,8 @@ interface Props {
   revealLine: number | null
   breakpoints: ReadonlySet<number>
   onToggleBreakpoint: (line: number) => void
+  /** Plages de lignes à masquer (branches non exécutées repliées). */
+  hiddenRanges?: { start: number; end: number }[]
   /** Sélection courante (null si vide) : ligne/colonne 1-based du début + texte. */
   onSelectionChange?: (sel: { text: string; startLine: number; startColumn: number } | null) => void
 }
@@ -126,6 +135,7 @@ export default function CodeEditor({
   revealLine,
   breakpoints,
   onToggleBreakpoint,
+  hiddenRanges,
   onSelectionChange
 }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -232,6 +242,20 @@ export default function CodeEditor({
       }))
     )
   }, [decorations])
+
+  // Repli des branches non exécutées : setHiddenAreas masque les plages sans
+  // toucher au document (les numéros de ligne restent ceux du source).
+  useEffect(() => {
+    const editor = editorRef.current as
+      | (monaco.editor.IStandaloneCodeEditor & {
+          setHiddenAreas?: (ranges: monaco.IRange[]) => void
+        })
+      | null
+    if (!editor?.setHiddenAreas) return
+    editor.setHiddenAreas(
+      (hiddenRanges ?? []).map((r) => new monaco.Range(r.start, 1, r.end, 1))
+    )
+  }, [hiddenRanges])
 
   useEffect(() => {
     bpCollectionRef.current?.set(

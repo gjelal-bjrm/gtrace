@@ -10,13 +10,22 @@ using GTrace.Parser.Parsing;
 
 Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
+// L'ENTRÉE doit être lue en UTF-8 explicitement : Console.ReadLine() décode
+// sinon avec la page de codes de la console (CP850 sous Windows), ce qui
+// corrompt tout caractère non-ASCII. Un identifiant comme [N°Client] arrivait
+// en [NÂ°Client] et SQL Server répondait « Invalid column name ».
+var stdin = new StreamReader(
+    Console.OpenStandardInput(),
+    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+);
+
 var jsonOptions = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 };
 
 string? line;
-while ((line = Console.ReadLine()) != null)
+while ((line = stdin.ReadLine()) != null)
 {
     line = line.TrimStart('\uFEFF'); // BOM éventuel injecté par certains shells
     if (string.IsNullOrWhiteSpace(line)) continue;

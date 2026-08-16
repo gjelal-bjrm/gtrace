@@ -1,7 +1,12 @@
 import type { JSX } from 'react'
 import { formatSqlValue, useReplayStore, variablesAt } from '../../stores/replayStore'
 
-export default function VariablesPanel(): JSX.Element {
+export default function VariablesPanel({
+  onOpenProcedure
+}: {
+  /** Ouvre le corps de la procédure appelée, paramètres repris de l'appel. */
+  onOpenProcedure?: () => void
+} = {}): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
 
@@ -30,12 +35,17 @@ export default function VariablesPanel(): JSX.Element {
           le script que vous avez lancé — soit une seule instruction — et non l&apos;intérieur de la
           procédure. C&apos;est pour cela qu&apos;aucune variable n&apos;apparaît ici.
         </p>
-        <p className="hint">
-          Pour suivre les variables <em>à l&apos;intérieur</em> de la procédure, ouvrez son code :
-          explorateur à gauche → <strong>Procédures stockées</strong> → icône{' '}
-          <strong>🐞</strong>. Renseignez ensuite ses paramètres dans l&apos;onglet{' '}
-          <em>Exécution</em>, puis relancez.
-        </p>
+        {onOpenProcedure && (
+          <div className="proc-call-action">
+            <button className="btn btn-primary" onClick={onOpenProcedure}>
+              📂 Ouvrir la procédure et suivre ses variables
+            </button>
+            <span className="hint">
+              GTrace va chercher son code en base, l&apos;ouvre dans un onglet et reprend
+              automatiquement les valeurs de votre appel comme paramètres.
+            </span>
+          </div>
+        )}
         <p className="hint">
           Ce que la procédure a <em>renvoyé</em> reste visible dans l&apos;onglet{' '}
           <strong>Résultats</strong>.

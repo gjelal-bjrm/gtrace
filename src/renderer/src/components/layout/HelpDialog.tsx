@@ -157,6 +157,22 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
             </tbody>
           </table>
 
+          <h3>La bande colorée en bas : la chronologie</h3>
+          <p className="help-para">
+            Chaque petite case est <strong>une instruction réellement exécutée</strong>, dans
+            l&apos;ordre. Sa couleur indique le temps qu&apos;elle a pris — du gris (rapide) au
+            rouge (parmi les plus lentes) — et le rouge vif signale une erreur interceptée. Une
+            boucle qui tourne 50 fois produit 50 cases.
+          </p>
+          <p className="help-para">
+            <strong>Cliquez une case</strong> pour revenir à ce moment : l&apos;éditeur surligne la
+            ligne concernée et l&apos;onglet <em>Variables</em> reprend les valeurs qu&apos;elles
+            avaient <em>à cet instant</em>. C&apos;est tout l&apos;intérêt du voyage dans le
+            temps : on rejoue l&apos;exécution sans relancer la requête. Les flèches{' '}
+            <span className="help-key">⏮ ◀ ▶ ⏭</span> font la même chose au clavier avec{' '}
+            <span className="help-key">F10</span> et <span className="help-key">Maj+F10</span>.
+          </p>
+
           <h3>Deux confusions fréquentes</h3>
           <ul className="help-diff">
             <li>
