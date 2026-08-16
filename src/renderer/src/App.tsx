@@ -31,6 +31,7 @@ import { Wordmark } from './components/layout/Logo'
 import UpdateBanner from './components/layout/UpdateBanner'
 import StatusBar from './components/layout/StatusBar'
 import ThemeDialog from './components/layout/ThemeDialog'
+import HelpDialog from './components/layout/HelpDialog'
 import { useAppearanceStore } from './stores/appearanceStore'
 import WhatsNew from './components/layout/WhatsNew'
 import { useUpdateStore } from './stores/updateStore'
@@ -135,6 +136,7 @@ export default function App(): JSX.Element {
   /** Résultats agrandis : masque l'éditeur pour donner toute la place aux données. */
   const [focusMode, setFocusMode] = useState(false)
   const [showTheme, setShowTheme] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   // Applique le thème enregistré au démarrage (variables CSS sur :root).
   useEffect(() => {
     useAppearanceStore.getState().init()
@@ -1075,6 +1077,13 @@ export default function App(): JSX.Element {
           </button>
           <button
             className="btn btn-ghost"
+            onClick={() => setShowHelp(true)}
+            title="Aide : à quoi servent les boutons et les panneaux"
+          >
+            ❓ Aide
+          </button>
+          <button
+            className="btn btn-ghost"
             onClick={() => setShowTheme(true)}
             title="Apparence : thèmes, taille du texte, densité des tableaux"
           >
@@ -1098,6 +1107,7 @@ export default function App(): JSX.Element {
         <WhatsNew since={whatsNewSince} onClose={() => setWhatsNewSince(null)} />
       )}
       {showTheme && <ThemeDialog onClose={() => setShowTheme(false)} />}
+      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {showAiActivity && (
         <AiActivityPanel activeConnection={activeConn} onClose={() => setShowAiActivity(false)} />
       )}
@@ -1332,28 +1342,28 @@ export default function App(): JSX.Element {
             style={focusMode ? undefined : { height: resultsHeight }}
           >
           <nav className="tabs">
-            <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')}>
+            <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')} title="Paramètres de la procédure, options et export — le point de départ avant de lancer">
               Exécution
             </button>
-            <button className={tab === 'variables' ? 'active' : ''} onClick={() => setTab('variables')}>
+            <button className={tab === 'variables' ? 'active' : ''} onClick={() => setTab('variables')} title="Valeur de toutes les variables au step sélectionné (rempli automatiquement par l’exécution)">
               Variables
             </button>
-            <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')}>
+            <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')} title="Les jeux de données renvoyés par vos SELECT">
               Résultats
               {run && run.resultsets.length > 0 && (
                 <span className="tab-count">{run.resultsets.length}</span>
               )}
             </button>
-            <button className={tab === 'data' ? 'active' : ''} onClick={() => setTab('data')}>
+            <button className={tab === 'data' ? 'active' : ''} onClick={() => setTab('data')} title="Contenu des tables suivies après chaque écriture, avec le différentiel — même sans SELECT et malgré un ROLLBACK">
               Données
               {run && run.snapshots.length > 0 && (
                 <span className="tab-count">{run.snapshots.length}</span>
               )}
             </button>
-            <button className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')}>
+            <button className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')} title="Vos propres requêtes, réévaluées à chaque pause du débogage">
               Inspect
             </button>
-            <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>
+            <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')} title="Temps passé par ligne — se remplit après un ⚡ Profiler">
               Profil
             </button>
             <button
