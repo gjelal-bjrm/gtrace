@@ -1651,6 +1651,86 @@ th {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* ─── Panneau « Accès de l'IA » ──────────────────────────────────────────── */
+
+.ai-intro {
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+
+.ai-grant-box {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  background: var(--bg-input);
+}
+
+.ai-grant-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-grant-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.ai-section-title {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ai-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.ai-check input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ai-note {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.ai-mask-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 2px 16px;
+}
+
+.ai-grant-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-refus {
+  color: var(--error);
+  font-size: 12px;
+}
+
 /* ─── Dialogue Apparence / thèmes ────────────────────────────────────────── */
 
 .theme-dialog {

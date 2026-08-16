@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { McpAuditEntry, McpConnection } from '@shared/types'
 import type { OpenConnection } from '../../stores/connectionsStore'
 
@@ -8,10 +8,64 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * Catégories de colonnes sensibles proposées à cocher, plutôt qu'une liste de
+ * mots à saisir. Chaque catégorie se traduit en motifs comparés en sous-chaîne
+ * et sans casse au nom de colonne (cf. McpGateway.maskRow) : « nom » masque
+ * donc « NomClient », « iban » masque « IBAN_Payeur », etc.
+ */
+const MASK_CATEGORIES: { id: string; label: string; example: string; patterns: string[] }[] = [
+  {
+    id: 'secrets',
+    label: 'Mots de passe et secrets',
+    example: 'Password, Token, Hash',
+    patterns: ['password', 'passwd', 'pwd', 'mdp', 'secret', 'token', 'hash', 'salt']
+  },
+  {
+    id: 'bank',
+    label: 'Coordonnées bancaires',
+    example: 'IBAN, BIC, NoCarte',
+    patterns: ['iban', 'bic', 'swift', 'carte', 'card', 'compte', 'account']
+  },
+  {
+    id: 'email',
+    label: 'Adresses e-mail',
+    example: 'MailClient, Courriel',
+    patterns: ['mail', 'courriel']
+  },
+  {
+    id: 'phone',
+    label: 'Numéros de téléphone',
+    example: 'TelPrivClient, Mobile',
+    patterns: ['tel', 'phone', 'mobile', 'gsm']
+  },
+  {
+    id: 'identity',
+    label: 'Noms et prénoms',
+    example: 'NomClient, PrenomClient',
+    patterns: ['nom', 'prenom', 'name']
+  },
+  {
+    id: 'address',
+    label: 'Adresses postales',
+    example: 'AdrClient, VilleClient',
+    patterns: ['adr', 'adresse', 'rue', 'ville', 'npa', 'zip', 'street']
+  },
+  {
+    id: 'birth',
+    label: 'Dates de naissance',
+    example: 'NaissanceClient',
+    patterns: ['naissance', 'birth']
+  }
+]
+
+/** Cochées par défaut : le strict minimum qu'on ne veut jamais voir sortir. */
+const DEFAULT_MASKS = ['secrets', 'bank', 'email']
+
 export default function AiActivityPanel({ activeConnection, onClose }: Props): JSX.Element {
   const [granted, setGranted] = useState<McpConnection[]>([])
   const [audit, setAudit] = useState<McpAuditEntry[]>([])
-  const [maskPatterns, setMaskPatterns] = useState('email, iban, password')
+  const [masks, setMasks] = useState<Set<string>>(() => new Set(DEFAULT_MASKS))
   const [allowRuns, setAllowRuns] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,13 +78,19 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
     void refresh()
   }, [refresh])
 
+  const toggleMask = useCallback((id: string) => {
+    setMasks((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
   const grant = useCallback(async () => {
     if (!activeConnection) return
     setError(null)
-    const patterns = maskPatterns
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean)
+    const patterns = MASK_CATEGORIES.filter((c) => masks.has(c.id)).flatMap((c) => c.patterns)
     try {
       const ref = activeConnection.ref
       await window.gtrace.mcpGrant({
@@ -43,7 +103,7 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [activeConnection, maskPatterns, allowRuns, refresh])
+  }, [activeConnection, masks, allowRuns, refresh])
 
   const revoke = useCallback(
     async (id: string) => {
@@ -53,12 +113,14 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
     [refresh]
   )
 
+  const isProd = activeConnection?.production === true
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal ai-activity" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>Activité IA — accès MCP</span>
-          <button className="link-btn" onClick={onClose}>
+          <span>🤖 Accès de l&apos;IA à vos données</span>
+          <button className="btn btn-icon" onClick={onClose} title="Fermer">
             ✕
           </button>
         </div>
@@ -66,54 +128,96 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
         <div className="modal-body">
           {error && <div className="error-box">{error}</div>}
 
-          <h3>Connexions exposées à l&apos;IA (lecture seule)</h3>
-          <p className="hint">
-            Opt-in explicite. Le serveur MCP (Claude Code…) ne peut interroger que ces
-            connexions, en SELECT uniquement. Les connexions « production » sont refusées.
+          <p className="hint ai-intro">
+            Par défaut, un assistant IA (Claude Code, etc.) n&apos;a <strong>aucun accès</strong> à
+            vos bases. Vous pouvez lui ouvrir une connexion précise, en lecture seule : il pourra
+            alors lire le schéma et lancer des <span className="vars">SELECT</span> pour vous aider
+            à diagnostiquer. Toute écriture est refusée, et chaque appel est journalisé plus bas.
           </p>
-          <div className="grant-row">
-            <span className="vars">
-              {activeConnection
-                ? `${activeConnection.label}${activeConnection.production ? ' ⚠ PROD' : ''}`
-                : '(aucune connexion active)'}
-            </span>
-            <input
-              className="watch-input"
-              placeholder="masquer colonnes : email, iban…"
-              value={maskPatterns}
-              onChange={(e) => setMaskPatterns(e.target.value)}
-            />
-            <button
-              className="btn btn-primary"
-              onClick={grant}
-              disabled={!activeConnection || activeConnection.production}
-              title={
-                activeConnection?.production
-                  ? 'Connexion production : non exposable'
-                  : 'Autoriser la connexion active'
-              }
-            >
-              Autoriser
-            </button>
-          </div>
-          <label className="toggle prod-toggle">
-            <input
-              type="checkbox"
-              checked={allowRuns}
-              onChange={(e) => setAllowRuns(e.target.checked)}
-            />
-            autoriser les runs autonomes (l&apos;IA peut lancer des sessions de debug sur cette
-            connexion via run_debug_session / gtrace-run)
-          </label>
 
+          <div className="ai-grant-box">
+            <div className="ai-grant-head">
+              <span className="ai-grant-label">Connexion à autoriser</span>
+              <span className="vars">
+                {activeConnection
+                  ? `${activeConnection.label}${isProd ? '  ⚠ PRODUCTION' : ''}`
+                  : '(aucune connexion active — connectez-vous d’abord)'}
+              </span>
+            </div>
+
+            <div className="ai-section-title">Ce que l&apos;IA pourra faire</div>
+            <label className="ai-check">
+              <input type="checkbox" checked disabled />
+              <span>
+                <strong>Lire</strong> le schéma et exécuter des <span className="vars">SELECT</span>{' '}
+                <span className="ai-note">— toujours inclus, jamais d&apos;écriture</span>
+              </span>
+            </label>
+            <label className="ai-check">
+              <input
+                type="checkbox"
+                checked={allowRuns}
+                onChange={(e) => setAllowRuns(e.target.checked)}
+              />
+              <span>
+                <strong>Lancer des sessions de débogage</strong> sur cette connexion
+                <span className="ai-note">
+                  {' '}
+                  — l&apos;IA peut exécuter une procédure et lire la trace, sans vous demander à
+                  chaque fois. Nécessaire pour qu&apos;elle teste à votre place.
+                </span>
+              </span>
+            </label>
+
+            <div className="ai-section-title">
+              Colonnes à masquer
+              <span className="ai-note">
+                {' '}
+                — leurs valeurs sont remplacées par <span className="vars">***</span>. Le nom de la
+                colonne reste visible, seule la donnée est cachée.
+              </span>
+            </div>
+            <div className="ai-mask-grid">
+              {MASK_CATEGORIES.map((c) => (
+                <label key={c.id} className="ai-check">
+                  <input
+                    type="checkbox"
+                    checked={masks.has(c.id)}
+                    onChange={() => toggleMask(c.id)}
+                  />
+                  <span>
+                    {c.label}
+                    <span className="ai-note"> — ex. {c.example}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="ai-grant-actions">
+              {isProd && (
+                <span className="ai-refus">
+                  Connexion marquée « production » : l&apos;accès IA est refusé par sécurité.
+                </span>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={grant}
+                disabled={!activeConnection || isProd}
+              >
+                Autoriser cette connexion
+              </button>
+            </div>
+          </div>
+
+          <h3>Connexions autorisées</h3>
           {granted.length > 0 ? (
             <table>
               <thead>
                 <tr>
-                  <th>Label</th>
+                  <th>Connexion</th>
                   <th>Serveur / base</th>
-                  <th>Masquage</th>
-                  <th>Runs autonomes</th>
+                  <th>Colonnes masquées</th>
+                  <th>Débogage autonome</th>
                   <th></th>
                 </tr>
               </thead>
@@ -124,11 +228,11 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
                     <td>
                       {c.server}/{c.database}
                     </td>
-                    <td>{c.maskPatterns.join(', ') || '—'}</td>
+                    <td>{c.maskPatterns.length > 0 ? `${c.maskPatterns.length} motif(s)` : 'aucune'}</td>
                     <td>{c.allowUnattendedRuns ? '▶ oui' : '—'}</td>
                     <td>
                       <button className="link-btn danger" onClick={() => revoke(c.id)}>
-                        révoquer
+                        retirer l&apos;accès
                       </button>
                     </td>
                   </tr>
@@ -136,7 +240,9 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
               </tbody>
             </table>
           ) : (
-            <p className="hint">Aucune connexion exposée.</p>
+            <p className="hint">
+              Aucune connexion autorisée : l&apos;IA n&apos;a accès à aucune de vos bases.
+            </p>
           )}
 
           <h3>
@@ -145,8 +251,12 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
               ↻
             </button>
           </h3>
+          <p className="hint">
+            Tout ce que l&apos;IA a demandé, avec le résultat. Rien n&apos;est effacé sans votre
+            action.
+          </p>
           {audit.length === 0 ? (
-            <p className="hint">Aucun appel MCP enregistré.</p>
+            <p className="hint">Aucun appel enregistré.</p>
           ) : (
             <table>
               <thead>
