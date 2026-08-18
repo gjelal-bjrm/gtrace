@@ -772,6 +772,45 @@ export default function App(): JSX.Element {
     [addConnection, ensureDatabases]
   )
 
+  // « GTrace.exe --connection <id|nom> » (lancé par GRay) : on ouvre la
+  // connexion enregistrée demandée. On attend que l'espace de travail soit
+  // restauré, sinon setAll() écraserait la connexion qu'on vient d'ajouter.
+  // Le nom est accepté en plus de l'id : les UUID sont locaux à la machine,
+  // seul le nom est stable d'un poste à l'autre.
+  useEffect(() => {
+    if (!restored) return
+    return window.gtrace.onOpenConnection(async (idOrName) => {
+      try {
+        const saved = await window.gtrace.listConnections()
+        const match =
+          saved.find((c) => c.id === idOrName) ??
+          saved.find((c) => c.name.toLowerCase() === idOrName.toLowerCase())
+        if (!match) {
+          setNotice(`connexion introuvable : ${idOrName}`)
+          return
+        }
+        const ref = { id: match.id }
+        const test = await window.gtrace.testConnection(ref)
+        if (!test.ok) {
+          setNotice(`connexion impossible : ${test.error ?? match.name}`)
+          return
+        }
+        onConnected({
+          id: crypto.randomUUID(),
+          ref,
+          label: match.name,
+          server: match.server,
+          user: match.user,
+          version: test.serverVersion?.split('\n')[0]?.trim() ?? 'SQL Server',
+          production: match.production ?? false,
+          defaultDatabase: match.database || 'master'
+        })
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : String(e))
+      }
+    })
+  }, [restored, onConnected])
+
   const onDisconnect = useCallback(
     (connectionId: string) => {
       if (locked) return

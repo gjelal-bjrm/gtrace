@@ -148,4 +148,6 @@ export interface GTraceApi {
   onDebugEvent: (cb: (event: DebugSessionEvent) => void) => () => void
   onXeEvent: (cb: (event: XEventsEvent) => void) => () => void
   onUpdateStatus: (cb: (status: UpdateStatus) => void) => () => void
+  /** « --connection <id|nom> » : ouvrir cette connexion enregistrée (lancé par GRay). */
+  onOpenConnection: (cb: (idOrName: string) => void) => () => void
 }

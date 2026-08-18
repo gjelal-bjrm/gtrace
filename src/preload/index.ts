@@ -64,6 +64,11 @@ const api: GTraceApi = {
     const listener = (_event: IpcRendererEvent, payload: XEventsEvent): void => cb(payload)
     ipcRenderer.on('xe:event', listener)
     return () => ipcRenderer.removeListener('xe:event', listener)
+  },
+  onOpenConnection: (cb) => {
+    const listener = (_event: IpcRendererEvent, idOrName: string): void => cb(idOrName)
+    ipcRenderer.on('connection:open', listener)
+    return () => ipcRenderer.removeListener('connection:open', listener)
   }
 }
 
