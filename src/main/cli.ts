@@ -13,8 +13,23 @@
 export function connectionFromArgv(argv: string[], isPackaged: boolean): string | null {
   // argv[0] = exécutable ; en dev, argv[1] = dossier de l'app.
   const args = argv.slice(isPackaged ? 1 : 2)
+
+  // Forme collée : rien ne peut la couper.
+  const glued = args.find((a) => a.startsWith('--connection='))
+  if (glued) {
+    const value = glued.slice('--connection='.length).trim()
+    return value === '' ? null : value
+  }
+
+  // Forme séparée. Piège vérifié dans les journaux de GVue : quand
+  // l'application tourne déjà, Electron livre à « second-instance » un argv où
+  // IL A INSÉRÉ ses propres options entre l'option et sa valeur. Prendre
+  // l'élément suivant renvoyait un tiret, et la demande était abandonnée en
+  // silence. On enjambe les options pour trouver la valeur.
   const i = args.indexOf('--connection')
   if (i === -1) return null
-  const value = args[i + 1]
-  return value && !value.startsWith('-') ? value : null
+  for (let k = i + 1; k < args.length; k++) {
+    if (!args[k].startsWith('-')) return args[k]
+  }
+  return null
 }
