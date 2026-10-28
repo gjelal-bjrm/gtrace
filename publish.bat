@@ -9,6 +9,8 @@ echo.
 
 REM --- 1) Token GitHub (jamais stocke dans ce fichier) ---
 REM Tu peux le definir avant de lancer (set GH_TOKEN=ghp_...) pour ne pas le retaper.
+REM Le token doit pouvoir CREER UNE RELEASE sur gjelal-bjrm/gtrace-releases
+REM (et, pendant la migration, sur gjelal-bjrm/gtrace).
 if not defined GH_TOKEN set /p GH_TOKEN=Colle ton token GitHub (ghp_...) :
 if not defined GH_TOKEN (
   echo.
@@ -63,25 +65,43 @@ echo Generation des notes de version...
 call node scripts\gen-whatsnew.cjs
 echo.
 
-REM --- 4) Build (sidecar + app) + televersement de la release ---
-call npm run publish
+REM --- 4) Build de l'installeur (sans televersement) ---
+call npm run dist
 if errorlevel 1 (
   echo.
-  echo === ECHEC de la publication. ===
-  echo Verifie : token valide ^(scope repo^), connexion internet, version superieure a la precedente.
+  echo === ECHEC du build. ===
   pause
   exit /b 1
 )
 
+REM --- 5) Publication : UNE release complete, publiee tout de suite ---
+call node scripts\relay-release.cjs gjelal-bjrm/gtrace-releases
+if errorlevel 1 (
+  echo.
+  echo === ECHEC de la publication. ===
+  echo Verifie : GH_TOKEN autorise a creer une release sur gtrace-releases,
+  echo connexion internet, version superieure a la precedente.
+  pause
+  exit /b 1
+)
+
+REM --- 6) MIGRATION : meme version relayee sur l'ancien depot "gtrace",
+REM que les installations existantes surveillent encore. A retirer quand
+REM toutes ont recu une version construite pour gtrace-releases.
+call node scripts\relay-release.cjs gjelal-bjrm/gtrace
+if errorlevel 1 (
+  echo.
+  echo [ATTENTION] Relais vers l'ancien depot gtrace echoue : les installations
+  echo existantes ne verront pas cette version. La publication principale est faite.
+)
+
 echo.
 echo =================================================
-echo   Build v!FINAL! televerse en BROUILLON sur GitHub.
+echo   GTrace v!FINAL! est PUBLIEE sur gtrace-releases.
+echo   Les applications installees la verront a leur prochaine
+echo   verification, et le site la proposera au telechargement.
 echo.
-echo   DERNIERE ETAPE (1 clic) :
-echo   GitHub -^> Releases -^> ouvre le brouillon v!FINAL!
-echo   -^> bouton "Publish release".
-echo   (Cela cree le tag ; ensuite les apps installees se
-echo    mettront a jour automatiquement.)
+echo   RAPPEL : ce depot doit rester PUBLIC.
 echo =================================================
 echo.
 echo Pense a committer le changement de version + les notes :

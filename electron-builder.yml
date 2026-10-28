@@ -2,13 +2,19 @@ appId: com.gtrace.app
 productName: GTrace
 
 # Flux de mise à jour (electron-updater lit la même config) : releases GitHub.
-# La release est créée en BROUILLON (défaut) : GitHub refuse une release publiée
-# si le tag n'existe pas encore. On publie le brouillon en un clic sur GitHub
-# (cela crée le tag) ; ensuite l'auto-update voit la version.
+#
+# Dépôt SÉPARÉ « gtrace-releases », PUBLIC, qui ne contient que les installeurs
+# (comme gvue-releases et gray-releases) : c'est lui que le site gsoftware.ch
+# interroge pour son bouton « Télécharger », sans exposer le dépôt du code.
+# electron-updater lit https://github.com/OWNER/REPO/releases.atom SANS
+# authentification : ce dépôt doit rester public.
+#
+# La publication passe par scripts/relay-release.cjs (publish.bat), qui crée une
+# release publiée d'emblée, plutôt que par electron-builder (brouillons).
 publish:
   provider: github
   owner: gjelal-bjrm
-  repo: gtrace
+  repo: gtrace-releases
 
 directories:
   output: dist
