@@ -28,6 +28,11 @@ import ConnectDialog from './components/connections/ConnectDialog'
 import AiActivityPanel from './components/panels/AiActivityPanel'
 import DiagnosisModal from './components/panels/DiagnosisModal'
 import TabBar from './components/editor/TabBar'
+import SaveChangesDialog, { type SaveChoice } from './components/editor/SaveChangesDialog'
+import { editorAction, editorPaste } from './components/editor/CodeEditor'
+import MenuBar, { type MenuDef } from './components/layout/MenuBar'
+import TreeMenu from './components/connections/TreeMenu'
+import { copyText } from './lib/clipboard'
 import Breadcrumb from './components/editor/Breadcrumb'
 import { breadcrumbFor, deadRanges, executedStatements, lastExecutedUse } from './lib/executionPath'
 import { tabLabel } from './lib/tabLabel'
@@ -481,7 +486,8 @@ export default function App(): JSX.Element {
               breakpoints: t.breakpoints ?? [],
               snapshotTargets: t.snapshotTargets ?? '',
               readOnly: t.readOnly ?? false,
-              roWhitelist: t.roWhitelist ?? ''
+              roWhitelist: t.roWhitelist ?? '',
+              pinned: t.pinned ?? false
             }
           })
         )
@@ -542,7 +548,8 @@ export default function App(): JSX.Element {
         breakpoints: t.breakpoints,
         snapshotTargets: t.snapshotTargets,
         readOnly: t.readOnly,
-        roWhitelist: t.roWhitelist
+        roWhitelist: t.roWhitelist,
+        pinned: t.pinned
       })),
       activeTabId: st.activeId
     }
@@ -769,23 +776,56 @@ export default function App(): JSX.Element {
     }
   }, [])
 
-  const doCloseTab = useCallback(
-    (id: string) => {
-      if (locked) return
+  /** Dialogue « Voulez-vous enregistrer les modifications… ? » en attente de réponse. */
+  const [savePrompt, setSavePrompt] = useState<{
+    titles: string[]
+    resolve: (choice: SaveChoice) => void
+  } | null>(null)
+  const askSave = useCallback(
+    (titles: string[]) =>
+      new Promise<SaveChoice>((resolve) => setSavePrompt({ titles, resolve })),
+    []
+  )
+
+  /**
+   * Ferme des onglets comme SSMS : s'il y a des modifications non
+   * enregistrées, une seule question Oui / Non / Annuler pour tous. Oui
+   * enregistre (ou demande où pour un nouveau fichier) ; renoncer à un
+   * enregistrement annule toute la fermeture.
+   */
+  const closeTabs = useCallback(
+    async (ids: string[]) => {
+      if (locked || ids.length === 0) return
       const st = useEditorStore.getState()
-      const t = st.tabs.find((x) => x.id === id)
-      if (
-        t?.dirty &&
-        !window.confirm(`« ${t.title} » a des modifications non enregistrées. Fermer quand même ?`)
-      ) {
-        return
+      const targets = st.tabs.filter((t) => ids.includes(t.id))
+      const dirty = targets.filter((t) => t.dirty)
+      if (dirty.length > 0) {
+        const choice = await askSave(dirty.map((t) => t.title))
+        if (choice === 'cancel') return
+        if (choice === 'yes') {
+          for (const t of dirty) {
+            try {
+              const res = await window.gtrace.saveFile(t.filePath, t.content, t.title)
+              if (!res) return
+              useEditorStore.getState().markSaved(t.id, res.path, res.name)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e))
+              return
+            }
+          }
+        }
       }
-      const wasActive = id === st.activeId
-      st.closeTab(id)
+      const wasActive = ids.includes(useEditorStore.getState().activeId)
+      for (const id of ids) useEditorStore.getState().closeTab(id)
       if (wasActive) resetDerived()
     },
-    [locked, resetDerived]
+    [locked, askSave, resetDerived]
   )
+
+  const doCloseTab = useCallback((id: string) => void closeTabs([id]), [closeTabs])
+
+  /** Clic droit sur un onglet. */
+  const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   // Raccourcis fichier : Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Maj+S / Ctrl+W
   useEffect(() => {
@@ -801,7 +841,8 @@ export default function App(): JSX.Element {
       } else if (k === 'n') {
         e.preventDefault()
         doNew()
-      } else if (k === 'w') {
+      } else if (k === 'w' || e.key === 'F4') {
+        // Ctrl+W, ou Ctrl+F4 comme SSMS : fermer l'onglet.
         e.preventDefault()
         doCloseTab(useEditorStore.getState().activeId)
       }
@@ -1203,6 +1244,9 @@ export default function App(): JSX.Element {
         e.preventDefault()
         if (session) void window.gtrace.debugStop(session.id)
         else if (xe) void window.gtrace.xeStop(xe.id)
+      } else if (e.key === 'F1') {
+        e.preventDefault()
+        setShowHelp(true)
       } else if (e.key === 'F8' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
         // F8 (SSMS) : afficher / masquer l'explorateur d'objets.
         e.preventDefault()
@@ -1415,53 +1459,143 @@ export default function App(): JSX.Element {
   }, [instr, run, currentStep, session])
 
 
+  const toggleFullScreen = (): void => {
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void document.documentElement.requestFullscreen()
+  }
+
+  /** Barre de menus façon SSMS : chaque commande à un seul endroit prévisible. */
+  const menus: MenuDef[] = [
+    {
+      label: 'Fichier',
+      items: [
+        { label: 'Nouvelle requête', shortcut: 'Ctrl+N', disabled: locked, onClick: doNew },
+        { label: 'Ouvrir…', shortcut: 'Ctrl+O', disabled: locked, onClick: () => void doOpen() },
+        'sep',
+        { label: `Enregistrer ${activeTab.title}`, shortcut: 'Ctrl+S', onClick: () => void doSave(false) },
+        { label: `Enregistrer ${activeTab.title} sous…`, shortcut: 'Ctrl+Maj+S', onClick: () => void doSave(true) },
+        'sep',
+        { label: 'Fermer', shortcut: 'Ctrl+W', disabled: locked, onClick: () => doCloseTab(activeId) },
+        { label: 'Fermer tous les documents', disabled: locked, onClick: () => void closeTabs(tabs.map((t) => t.id)) },
+        'sep',
+        { label: 'Quitter', shortcut: 'Alt+F4', onClick: () => window.close() }
+      ]
+    },
+    {
+      label: 'Édition',
+      items: [
+        { label: 'Annuler', shortcut: 'Ctrl+Z', onClick: () => editorAction('undo') },
+        { label: 'Rétablir', shortcut: 'Ctrl+Y', onClick: () => editorAction('redo') },
+        'sep',
+        { label: 'Couper', shortcut: 'Ctrl+X', onClick: () => editorAction('editor.action.clipboardCutAction') },
+        { label: 'Copier', shortcut: 'Ctrl+C', onClick: () => editorAction('editor.action.clipboardCopyAction') },
+        { label: 'Coller', shortcut: 'Ctrl+V', onClick: () => void editorPaste() },
+        { label: 'Sélectionner tout', shortcut: 'Ctrl+A', onClick: () => editorAction('editor.action.selectAll') },
+        'sep',
+        { label: 'Rechercher', shortcut: 'Ctrl+F', onClick: () => editorAction('actions.find') },
+        { label: 'Remplacer', shortcut: 'Ctrl+H', onClick: () => editorAction('editor.action.startFindReplaceAction') },
+        { label: 'Atteindre la ligne…', shortcut: 'Ctrl+G', onClick: () => editorAction('editor.action.gotoLine') },
+        'sep',
+        { label: 'Commenter les lignes', shortcut: 'Ctrl+K, Ctrl+C', onClick: () => editorAction('editor.action.addCommentLine') },
+        { label: 'Décommenter les lignes', shortcut: 'Ctrl+K, Ctrl+U', onClick: () => editorAction('editor.action.removeCommentLine') },
+        { label: 'Mettre en majuscules', shortcut: 'Ctrl+Maj+U', onClick: () => editorAction('editor.action.transformToUppercase') },
+        { label: 'Mettre en minuscules', shortcut: 'Ctrl+Maj+L', onClick: () => editorAction('editor.action.transformToLowercase') }
+      ]
+    },
+    {
+      label: 'Affichage',
+      items: [
+        { label: "Explorateur d'objets", shortcut: 'F8', checked: showExplorer, onClick: () => setShowExplorer((v) => !v) },
+        { label: 'Volet de résultats', shortcut: 'Ctrl+R', checked: !resultsHidden, onClick: () => setResultsHidden((h) => !h) },
+        { label: 'Agrandir les résultats', checked: focusMode, onClick: () => setFocusMode((f) => !f) },
+        'sep',
+        { label: 'Plein écran', shortcut: 'F11', onClick: toggleFullScreen },
+        { label: 'Apparence…', onClick: () => setShowTheme(true) }
+      ]
+    },
+    {
+      label: 'Requête',
+      items: [
+        {
+          label: breakpoints.size > 0 ? `Déboguer (${breakpoints.size} point(s) d'arrêt)` : selectionLines > 0 ? 'Exécuter la sélection' : 'Exécuter',
+          shortcut: 'F5',
+          bold: true,
+          disabled: !canRun,
+          onClick: () => void execute()
+        },
+        { label: 'Analyser', shortcut: 'Ctrl+F5', disabled: busy || locked, onClick: () => void analyze() },
+        { label: 'Profiler (temps par ligne)', disabled: !canRun, onClick: () => void startProfiling() },
+        {
+          label: 'Arrêter',
+          shortcut: 'Alt+Pause',
+          disabled: !session && !xe,
+          onClick: () => {
+            if (session) void window.gtrace.debugStop(session.id)
+            else if (xe) void window.gtrace.xeStop(xe.id)
+          }
+        },
+        'sep',
+        {
+          label: 'Connexion',
+          children: [
+            { label: 'Connecter…', onClick: () => setShowConnect(true) },
+            {
+              label: "Déconnecter l'onglet",
+              disabled: !activeConn || locked,
+              onClick: () => useEditorStore.getState().patchActive({ connectionId: null, database: null })
+            }
+          ]
+        },
+        { label: 'Changer de base', shortcut: 'Ctrl+U', disabled: !activeConn || locked, onClick: () => dbPickerRef.current?.focus() }
+      ]
+    },
+    {
+      label: 'Outils',
+      items: [
+        { label: 'Accès IA / MCP…', onClick: () => setShowAiActivity(true) },
+        { label: 'Diagnostic IA de la dernière exécution…', disabled: !run, onClick: () => setShowDiagnosis(true) },
+        'sep',
+        { label: 'Apparence (thèmes, taille du texte)…', onClick: () => setShowTheme(true) },
+        { label: 'Rechercher les mises à jour', onClick: () => useUpdateStore.getState().check() }
+      ]
+    },
+    {
+      label: 'Aide',
+      items: [
+        { label: 'Aide de GTrace', shortcut: 'F1', onClick: () => setShowHelp(true) },
+        { label: 'Nouveautés', onClick: () => setWhatsNewSince('') },
+        'sep',
+        {
+          label: 'À propos de GTrace',
+          onClick: () =>
+            setNotice(
+              `GTrace v${appVersion || '?'} — moteur d'analyse ${status?.running ? `ScriptDom ${status.version ?? '?'}` : 'inactif'}`
+            )
+        }
+      ]
+    }
+  ]
+
+  const menuTab = tabMenu ? tabs.find((t) => t.id === tabMenu.id) : undefined
+
   return (
     <div className="app">
       <header className="topbar">
         <span className="brand">
-          <button
-            className="btn btn-icon"
-            onClick={() => setShowExplorer((v) => !v)}
-            title="Afficher/masquer l'explorateur"
-          >
-            ☰
-          </button>
           <Wordmark />
         </span>
+        <MenuBar menus={menus} />
         <span className="topbar-right">
-          <button className="btn btn-ghost" onClick={() => setShowAiActivity(true)} title="Accès IA / MCP">
-            🤖 Activité IA
-          </button>
-          <span className={`sidecar-status ${status?.running ? 'ok' : 'ko'}`}>
-            sidecar {status?.running ? `ScriptDom ${status.version ?? '?'}` : 'inactif'}
-          </span>
+          <span
+            className={`sidecar-status ${status?.running ? 'ok' : 'ko'}`}
+            title={status?.running ? `Moteur d'analyse ScriptDom ${status.version ?? ''}` : "Moteur d'analyse inactif"}
+          />
           <button
             className="btn btn-ghost app-version"
             onClick={() => setWhatsNewSince('')}
             title="Voir les nouveautés"
           >
             v{appVersion || '…'}
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowHelp(true)}
-            title="Aide : à quoi servent les boutons et les panneaux"
-          >
-            ❓ Aide
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowTheme(true)}
-            title="Apparence : thèmes, taille du texte, densité des tableaux"
-          >
-            🎨 Thème
-          </button>
-          <button
-            className="btn btn-icon"
-            onClick={() => useUpdateStore.getState().check()}
-            title="Vérifier les mises à jour"
-          >
-            ⟳
           </button>
         </span>
       </header>
@@ -1474,6 +1608,60 @@ export default function App(): JSX.Element {
         <WhatsNew since={whatsNewSince} onClose={() => setWhatsNewSince(null)} />
       )}
       {showTheme && <ThemeDialog onClose={() => setShowTheme(false)} />}
+      {savePrompt && (
+        <SaveChangesDialog
+          titles={savePrompt.titles}
+          onChoice={(choice) => {
+            savePrompt.resolve(choice)
+            setSavePrompt(null)
+          }}
+        />
+      )}
+      {tabMenu && menuTab && (
+        <TreeMenu
+          x={tabMenu.x}
+          y={tabMenu.y}
+          onClose={() => setTabMenu(null)}
+          items={[
+            {
+              label: `Enregistrer ${menuTab.title}`,
+              shortcut: 'Ctrl+S',
+              onClick: () => {
+                switchToTab(menuTab.id)
+                void doSave(false)
+              }
+            },
+            { label: 'Fermer', shortcut: 'Ctrl+W', disabled: locked, onClick: () => doCloseTab(menuTab.id) },
+            { label: 'Fermer tous les documents', disabled: locked, onClick: () => void closeTabs(tabs.map((t) => t.id)) },
+            {
+              label: 'Fermer tout sauf cet élément',
+              disabled: locked,
+              onClick: () => void closeTabs(tabs.filter((t) => t.id !== menuTab.id).map((t) => t.id))
+            },
+            {
+              label: 'Tout fermer, sauf ceux épinglés',
+              disabled: locked,
+              onClick: () => void closeTabs(tabs.filter((t) => !t.pinned).map((t) => t.id))
+            },
+            'sep',
+            {
+              label: "Copier le chemin d'accès complet",
+              disabled: !menuTab.filePath,
+              onClick: () => void copyText(menuTab.filePath ?? '').then(() => setNotice('Chemin copié.'))
+            },
+            {
+              label: 'Ouvrir le dossier contenant',
+              disabled: !menuTab.filePath,
+              onClick: () => menuTab.filePath && void window.gtrace.revealFile(menuTab.filePath)
+            },
+            'sep',
+            {
+              label: menuTab.pinned ? "Désépingler l'onglet" : "Épingler l'onglet",
+              onClick: () => useEditorStore.getState().togglePin(menuTab.id)
+            }
+          ]}
+        />
+      )}
       {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {showAiActivity && (
         <AiActivityPanel activeConnection={activeConn} onClose={() => setShowAiActivity(false)} />
@@ -1690,6 +1878,7 @@ export default function App(): JSX.Element {
                   onSwitch={switchToTab}
                   runningTabId={busy || session ? activeId : null}
                   onClose={doCloseTab}
+                  onTabMenu={(id, x, y) => setTabMenu({ id, x, y })}
                   onNew={doNew}
                   onOpen={() => void doOpen()}
                   onSave={() => void doSave(false)}

@@ -12,6 +12,10 @@ export type MenuItem =
       /** Action du double-clic, affichée en gras (convention SSMS) */
       bold?: boolean
       disabled?: boolean
+      /** Raccourci affiché à droite (« Ctrl+N ») */
+      shortcut?: string
+      /** Coche devant l'entrée (bascules du menu Affichage) */
+      checked?: boolean
       children?: MenuItem[]
     }
 
@@ -40,8 +44,10 @@ function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => void }):
                 onDone()
               }}
             >
+              <span className="ctx-check">{item.checked ? '✓' : ''}</span>
               {item.label}
               {item.children && <span className="ctx-arrow">▸</span>}
+              {item.shortcut && <span className="ctx-key">{item.shortcut}</span>}
             </button>
             {item.children && open === i && (
               <div className="ctx-menu ctx-submenu">
@@ -59,12 +65,14 @@ export default function TreeMenu({
   x,
   y,
   items,
-  onClose
+  onClose,
+  className = 'tree-menu'
 }: {
   x: number
   y: number
   items: MenuItem[]
   onClose: () => void
+  className?: string
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ left: x, top: y })
@@ -90,7 +98,7 @@ export default function TreeMenu({
           onClose()
         }}
       />
-      <div className="ctx-menu tree-menu" ref={ref} style={pos}>
+      <div className={`ctx-menu ${className}`} ref={ref} style={pos}>
         <MenuList items={items} onDone={onClose} />
       </div>
     </>

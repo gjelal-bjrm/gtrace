@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import type {
@@ -233,6 +233,9 @@ export function registerIpcHandlers(
       return { path: target, name: basename(target) }
     }
   )
+
+  // « Ouvrir le dossier contenant » (clic droit sur un onglet, comme SSMS).
+  ipcMain.handle('file:reveal', (_event, path: string) => shell.showItemInFolder(path))
 
   ipcMain.handle('workspace:load', () => workspace.load())
   ipcMain.handle('workspace:save', (_event, state: WorkspaceState) => workspace.save(state))

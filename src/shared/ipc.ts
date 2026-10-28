@@ -81,6 +81,7 @@ export interface IpcContract {
   'workspace:load': () => Promise<WorkspaceLoadResult>
   'workspace:save': (state: WorkspaceState) => Promise<void>
   'file:read': (path: string) => Promise<string | null>
+  'file:reveal': (path: string) => Promise<void>
   'session:export': (input: HistorySaveInput, format: 'md' | 'json') => Promise<string | null>
   'history:save': (input: HistorySaveInput) => Promise<HistoryEntrySummary>
   'history:list': () => Promise<HistoryEntrySummary[]>
@@ -136,6 +137,8 @@ export interface GTraceApi {
   workspaceLoad: () => Promise<WorkspaceLoadResult>
   workspaceSave: (state: WorkspaceState) => Promise<void>
   readFile: (path: string) => Promise<string | null>
+  /** Ouvre l'Explorateur Windows sur le fichier (« Ouvrir le dossier contenant ») */
+  revealFile: (path: string) => Promise<void>
   exportSession: (input: HistorySaveInput, format: 'md' | 'json') => Promise<string | null>
   historySave: (input: HistorySaveInput) => Promise<HistoryEntrySummary>
   historyList: () => Promise<HistoryEntrySummary[]>

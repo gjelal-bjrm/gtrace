@@ -11,6 +11,27 @@ self.MonacoEnvironment = {
 
 registerSqlCompletion()
 
+/** Éditeur monté (il n'y en a qu'un) : cible des commandes du menu Édition. */
+let mountedEditor: monaco.editor.IStandaloneCodeEditor | null = null
+
+/** Lance une commande de l'éditeur depuis la barre de menus (annuler, rechercher…). */
+export function editorAction(id: string): void {
+  if (!mountedEditor) return
+  mountedEditor.focus()
+  mountedEditor.trigger('menu', id, null)
+}
+
+/** Coller depuis le menu : le presse-papiers est lu puis inséré à la sélection. */
+export async function editorPaste(): Promise<void> {
+  const editor = mountedEditor
+  if (!editor) return
+  const text = await navigator.clipboard.readText()
+  const sel = editor.getSelection()
+  if (!sel) return
+  editor.focus()
+  editor.executeEdits('menu', [{ range: sel, text, forceMoveMarkers: true }])
+}
+
 monaco.editor.defineTheme('gtrace-dark', {
   base: 'vs-dark',
   inherit: true,
@@ -197,6 +218,7 @@ export default function CodeEditor({
       dropIntoEditor: { enabled: false }
     })
     editorRef.current = editor
+    mountedEditor = editor
     collectionRef.current = editor.createDecorationsCollection()
     bpCollectionRef.current = editor.createDecorationsCollection()
 
@@ -224,6 +246,13 @@ export default function CodeEditor({
     editor.addCommand(
       monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyU),
       () => editor.trigger('ssms', 'editor.action.removeCommentLine', null)
+    )
+    // Majuscules / minuscules (SSMS : Ctrl+Maj+U / Ctrl+Maj+L).
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyU, () =>
+      editor.trigger('ssms', 'editor.action.transformToUppercase', null)
+    )
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyL, () =>
+      editor.trigger('ssms', 'editor.action.transformToLowercase', null)
     )
     // Tests automatisés en développement uniquement (jamais dans l'application installée).
     if (import.meta.env.DEV) (window as unknown as { __gtraceEditor?: unknown }).__gtraceEditor = editor
@@ -278,6 +307,7 @@ export default function CodeEditor({
       host.removeEventListener('drop', onDrop, true)
       editor.dispose()
       editorRef.current = null
+      if (mountedEditor === editor) mountedEditor = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- montage unique
   }, [])

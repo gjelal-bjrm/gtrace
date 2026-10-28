@@ -11,6 +11,8 @@ interface Props {
   /** Onglet dont l'exécution tourne (« Exécution… » après son nom, comme SSMS) */
   runningTabId: string | null
   onClose: (id: string) => void
+  /** Clic droit sur un onglet (menu Fermer / Épingler / Copier le chemin…) */
+  onTabMenu: (id: string, x: number, y: number) => void
   onNew: () => void
   onOpen: () => void
   onSave: () => void
@@ -22,6 +24,7 @@ export default function TabBar({
   onSwitch,
   runningTabId,
   onClose,
+  onTabMenu,
   onNew,
   onOpen,
   onSave,
@@ -78,10 +81,19 @@ export default function TabBar({
             key={t.id}
             className={`editor-tab${t.id === activeId ? ' active' : ''}`}
             onClick={() => onSwitch(t.id)}
+            onAuxClick={(e) => {
+              // Clic molette : ferme l'onglet (usage courant des éditeurs à onglets).
+              if (e.button === 1 && !locked) onClose(t.id)
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onTabMenu(t.id, e.clientX, e.clientY)
+            }}
             title={t.filePath ? `${label.full}
 ${t.filePath}` : label.full}
           >
             <span className="tab-title">
+              {t.pinned && <span className="tab-pin" title="Onglet épinglé">📌</span>}
               <span className="tab-name">{t.title}</span>
               <span className={`tab-target${t.connectionId ? '' : ' off'}`}> - {label.target}</span>
               {t.dirty ? '*' : ''}

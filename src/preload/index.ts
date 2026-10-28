@@ -42,6 +42,7 @@ const api: GTraceApi = {
   workspaceLoad: () => ipcRenderer.invoke('workspace:load'),
   workspaceSave: (state) => ipcRenderer.invoke('workspace:save', state),
   readFile: (path) => ipcRenderer.invoke('file:read', path),
+  revealFile: (path) => ipcRenderer.invoke('file:reveal', path),
   exportSession: (input, format) => ipcRenderer.invoke('session:export', input, format),
   historySave: (input) => ipcRenderer.invoke('history:save', input),
   historyList: () => ipcRenderer.invoke('history:list'),

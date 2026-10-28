@@ -2497,3 +2497,92 @@ th {
 .tree-row[draggable='true'] {
   cursor: default;
 }
+
+/* ─── Lot 5 : barre de menus et onglets façon SSMS ──────────────────────── */
+
+.topbar {
+  justify-content: flex-start;
+  gap: 14px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.topbar-right {
+  margin-left: auto;
+}
+
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+/* Menu ouvert : les titres restent au-dessus du fond cliquable, pour passer
+   d'un menu à l'autre au survol. */
+.menubar.open {
+  z-index: 203;
+}
+
+/* Le fond cliquable du menu vit dans la barre : les titres passent devant. */
+.menubar.open .menubar-item {
+  position: relative;
+  z-index: 202;
+}
+
+.menubar-item {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menubar-item:hover,
+.menubar-item.active {
+  background: var(--bg-hover);
+}
+
+.menubar-item.active {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.ctx-menu.menubar-menu {
+  min-width: 260px;
+  max-width: 380px;
+  border-top-left-radius: 0;
+}
+
+.ctx-check {
+  display: inline-block;
+  width: 16px;
+  color: var(--accent);
+}
+
+.ctx-menu .ctx-item {
+  white-space: nowrap;
+}
+
+.tab-pin {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+.save-changes-dialog {
+  width: 440px;
+}
+
+.save-changes-list {
+  margin: 8px 0 14px;
+  padding: 8px 12px 8px 28px;
+  max-height: 180px;
+  overflow: auto;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}

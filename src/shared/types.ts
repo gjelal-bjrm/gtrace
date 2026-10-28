@@ -401,6 +401,8 @@ export interface PersistedTab {
   snapshotTargets: string
   readOnly: boolean
   roWhitelist: string
+  /** Onglet épinglé (à gauche, épargné par « Fermer tous les documents ») */
+  pinned?: boolean
 }
 
 export interface WorkspaceState {

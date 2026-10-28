@@ -28,6 +28,8 @@ export interface EditorTab {
   readOnly: boolean
   /** Liste blanche du mode lecture seule (tables/procs autorisées en écriture) */
   roWhitelist: string
+  /** Épinglé : reste à gauche et n'est pas fermé par « Fermer tous les documents » */
+  pinned: boolean
 }
 
 let untitledCounter = 0
@@ -50,7 +52,8 @@ function makeTab(over: Partial<EditorTab> = {}): EditorTab {
     breakpoints: over.breakpoints ?? [],
     snapshotTargets: over.snapshotTargets ?? '',
     readOnly: over.readOnly ?? false,
-    roWhitelist: over.roWhitelist ?? ''
+    roWhitelist: over.roWhitelist ?? '',
+    pinned: over.pinned ?? false
   }
 }
 
@@ -78,6 +81,8 @@ interface EditorState {
   /** Met à jour le contexte d'édition de l'onglet actif (ne touche pas dirty). */
   patchActive: (patch: Partial<EditorTab>) => void
   markSaved: (id: string, filePath: string, name: string) => void
+  /** Épingle / désépingle ; les onglets épinglés passent en tête (comme SSMS). */
+  togglePin: (id: string) => void
   /** Remplace tous les onglets (restauration de l'espace de travail au lancement). */
   restore: (tabs: EditorTab[], activeId: string | null) => void
 }
@@ -153,6 +158,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, filePath, title: name, dirty: false } : t))
     })),
+  togglePin: (id) =>
+    set((s) => {
+      const tabs = s.tabs.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t))
+      return { tabs: [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)] }
+    }),
   restore: (tabs, activeId) => {
     if (tabs.length === 0) return
     const active = activeId && tabs.some((t) => t.id === activeId) ? activeId : tabs[0].id
