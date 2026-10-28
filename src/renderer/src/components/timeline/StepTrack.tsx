@@ -35,6 +35,7 @@ export default function StepTrack({
   model,
   current,
   bookmarks,
+  compareFrom,
   colorMode,
   matches,
   watchColors,
@@ -44,6 +45,8 @@ export default function StepTrack({
   model: RunModel
   current: number
   bookmarks: Bookmarks
+  /** Point A de « Comparer deux moments » (null : pas de comparaison) */
+  compareFrom: number | null
   colorMode: ColorMode
   matches: (index: number) => boolean
   /** Couleur de la variable suivie modifiée par chaque étape (null : aucune) */
@@ -160,6 +163,15 @@ export default function StepTrack({
         onSelect(Math.max(0, Math.min(n - 1, to)))
       }}
     >
+      {compareFrom !== null && compareFrom !== current && (
+        <span
+          className="dr-compare-band"
+          style={{
+            left: pct(Math.min(compareFrom, current) + 0.5, n),
+            width: pct(Math.abs(current - compareFrom), n)
+          }}
+        />
+      )}
       {slotPx >= 4 && (
         <span className="dr-slot" style={{ left: pct(current, n), width: pct(1, n) }} />
       )}
@@ -227,6 +239,11 @@ export default function StepTrack({
         })}
       </div>
 
+      {compareFrom !== null && (
+        <span className="dr-pin" style={{ left: pct(compareFrom + 0.5, n) }} aria-hidden="true">
+          <span className="dr-pin-label">A</span>
+        </span>
+      )}
       <span className="dr-playhead" style={{ left: pct(current + 0.5, n) }} />
 
       {hovered &&

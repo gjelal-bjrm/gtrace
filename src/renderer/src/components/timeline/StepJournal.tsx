@@ -22,6 +22,7 @@ export default function StepJournal({
   model,
   current,
   bookmarks,
+  compareFrom,
   filtered,
   followVar,
   matches,
@@ -33,6 +34,8 @@ export default function StepJournal({
   model: RunModel
   current: number
   bookmarks: Bookmarks
+  /** Point A de « Comparer deux moments » */
+  compareFrom: number | null
   /** Un filtre est actif : liste à plat des seules étapes retenues */
   filtered: boolean
   /** Variable suivie : la colonne Effet montre sa valeur avant → après */
@@ -205,6 +208,11 @@ export default function StepJournal({
                 <span className="dr-c-line">l. {s.line}</span>
                 <span className={`dr-badge dr-badge-${s.category}`}>{CATEGORY_LABEL[s.category]}</span>
                 <span className="dr-c-code" style={{ paddingLeft: row.depth * 16 }}>
+                  {row.index === compareFrom && (
+                    <span className="dr-pin-pill" title="Point A de la comparaison">
+                      A
+                    </span>
+                  )}
                   {mark && (
                     <span className="dr-mark">
                       <Flag size={11} strokeWidth={2.2} aria-hidden="true" />

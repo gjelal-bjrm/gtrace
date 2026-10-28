@@ -146,6 +146,17 @@ export interface RunModel {
   variables: VariableTrack[]
 }
 
+const models = new WeakMap<DebugRunResult, { source: string; model: RunModel }>()
+
+/** Modèle d'une exécution, calculé une seule fois pour tous les panneaux qui l'affichent. */
+export function getRunModel(run: DebugRunResult, source: string): RunModel {
+  const hit = models.get(run)
+  if (hit && hit.source === source) return hit.model
+  const model = buildRunModel(run, source)
+  models.set(run, { source, model })
+  return model
+}
+
 export function buildRunModel(run: DebugRunResult, source: string): RunModel {
   const lines = source.split(/\r?\n/)
   const byIndex = new Map<number, InstrumentedStatement>()

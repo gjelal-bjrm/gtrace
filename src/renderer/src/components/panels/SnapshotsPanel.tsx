@@ -3,6 +3,7 @@ import type { TableSnapshot } from '@shared/types'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
 import { Camera } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
+import { multisetDiff, rowKey } from '../../lib/tableDiff'
 
 interface DiffedSnapshot {
   snapshot: TableSnapshot
@@ -11,37 +12,9 @@ interface DiffedSnapshot {
   removedRows: unknown[][]
 }
 
-function rowKey(row: unknown[]): string {
-  return JSON.stringify(row.map((v) => (v instanceof Date ? v.toISOString() : v)))
-}
-
-/** Diff multiset : lignes ajoutées/supprimées entre deux snapshots de la même table. */
+/** Lignes ajoutées/supprimées entre deux snapshots de la même table. */
 function diff(current: TableSnapshot, previous: TableSnapshot | null): DiffedSnapshot {
-  const prevCounts = new Map<string, number>()
-  for (const row of previous?.rows ?? []) {
-    const k = rowKey(row)
-    prevCounts.set(k, (prevCounts.get(k) ?? 0) + 1)
-  }
-  const addedKeys = new Map<string, number>()
-  for (const row of current.rows) {
-    const k = rowKey(row)
-    const left = prevCounts.get(k) ?? 0
-    if (left > 0) {
-      prevCounts.set(k, left - 1)
-    } else {
-      addedKeys.set(k, (addedKeys.get(k) ?? 0) + 1)
-    }
-  }
-  const removedRows: unknown[][] = []
-  for (const row of previous?.rows ?? []) {
-    const k = rowKey(row)
-    const count = prevCounts.get(k) ?? 0
-    if (count > 0) {
-      removedRows.push(row)
-      prevCounts.set(k, count - 1)
-    }
-  }
-  return { snapshot: current, previous, addedKeys, removedRows }
+  return { snapshot: current, previous, ...multisetDiff(current.rows, previous?.rows ?? []) }
 }
 
 export default function SnapshotsPanel(): JSX.Element {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownToDot,
+  ArrowLeftRight,
   Bot,
   Camera,
   Check,
@@ -67,6 +68,7 @@ import RunPanel from './components/panels/RunPanel'
 import InspectPanel from './components/panels/InspectPanel'
 import ProfilePanel from './components/panels/ProfilePanel'
 import SnapshotsPanel from './components/panels/SnapshotsPanel'
+import ComparePanel from './components/panels/ComparePanel'
 import CodePeek from './components/panels/CodePeek'
 import ObjectExplorer, { type OpenScript } from './components/connections/ObjectExplorer'
 import HistoryPanel from './components/connections/HistoryPanel'
@@ -145,7 +147,7 @@ interface XeResult {
   errors: StepError[]
 }
 
-type Tab = 'run' | 'variables' | 'results' | 'messages' | 'data' | 'inspect' | 'profile'
+type Tab = 'run' | 'variables' | 'results' | 'messages' | 'data' | 'compare' | 'inspect' | 'profile'
 
 export default function App(): JSX.Element {
   // ─── Onglets d'édition (chaque onglet = un document lié à une connexion) ───
@@ -493,6 +495,13 @@ export default function App(): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
   const setRun = useReplayStore((s) => s.setRun)
+  // Épingler un moment dans le Déroulé ouvre l'onglet Comparer.
+  const compareFrom = useReplayStore((s) => s.compareFrom)
+  useEffect(() => {
+    if (compareFrom === null) return
+    setTab('compare')
+    setResultsHidden(false)
+  }, [compareFrom])
 
   useEffect(() => {
     window.gtrace.sidecarStatus().then(setStatus).catch(() => setStatus(null))
@@ -2150,6 +2159,7 @@ export default function App(): JSX.Element {
               {resultTab('run', SlidersHorizontal, 'Paramètres', 'Paramètres de la procédure, options (lecture seule, tables suivies), export et diagnostic')}
               {resultTab('variables', Variable, 'Variables', "Valeur de toutes les variables à l'étape sélectionnée dans la chronologie")}
               {resultTab('data', Camera, 'Données', 'Contenu des tables suivies après chaque écriture, avec le différentiel — même sans SELECT et malgré un ROLLBACK', run?.snapshots.length)}
+              {resultTab('compare', ArrowLeftRight, 'Comparer', "Ce qui a changé entre deux moments du Déroulé : variables et tables suivies")}
               {resultTab('inspect', ScanSearch, 'Inspect', 'Vos propres requêtes, réévaluées à chaque pause du débogage')}
               {resultTab('profile', Gauge, 'Profil', 'Temps passé par ligne — se remplit après « Profiler »')}
               <span className="results-spacer" />
@@ -2198,6 +2208,7 @@ export default function App(): JSX.Element {
               {tab === 'results' && <ResultsPanel />}
               {tab === 'messages' && <MessagesPanel messages={messages} onGoToLine={goToLine} />}
               {tab === 'data' && <SnapshotsPanel />}
+              {tab === 'compare' && <ComparePanel />}
               {tab === 'inspect' && (
                 <InspectPanel
                   activeRef={activeRef}

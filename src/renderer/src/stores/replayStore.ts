@@ -20,6 +20,8 @@ interface ReplayState {
   source: string
   bookmarks: Bookmarks
   historyId: string | null
+  /** « Comparer deux moments » : étape épinglée (point A), comparée à l'étape courante */
+  compareFrom: number | null
   setRun: (run: DebugRunResult | null, context?: RunContext) => void
   beginLive: (sessionId: string, instrument: InstrumentResult, source?: string) => void
   appendStep: (step: TraceStep) => void
@@ -28,6 +30,7 @@ interface ReplayState {
   setBookmark: (stepIndex: number, name: string) => void
   /** L'exécution vient d'être enregistrée : ses signets la suivent désormais. */
   attachHistory: (historyId: string) => void
+  setCompareFrom: (stepIndex: number | null) => void
   select: (index: number) => void
   next: () => void
   prev: () => void
@@ -46,11 +49,13 @@ export const useReplayStore = create<ReplayState>((set, get) => ({
   source: '',
   bookmarks: {},
   historyId: null,
+  compareFrom: null,
   setRun: (run, context) =>
     set({
       run,
       currentStep: 0,
       live: false,
+      compareFrom: null,
       source: context?.source ?? '',
       bookmarks: context?.bookmarks ?? {},
       historyId: context?.historyId ?? null
@@ -59,6 +64,7 @@ export const useReplayStore = create<ReplayState>((set, get) => ({
     set({
       live: true,
       currentStep: 0,
+      compareFrom: null,
       source: source ?? '',
       bookmarks: {},
       historyId: null,
@@ -87,6 +93,7 @@ export const useReplayStore = create<ReplayState>((set, get) => ({
     set({ bookmarks })
     persistBookmarks(get().historyId, bookmarks)
   },
+  setCompareFrom: (stepIndex) => set({ compareFrom: stepIndex }),
   attachHistory: (historyId) => {
     set({ historyId })
     // Signets posés avant l'enregistrement (session en pause, ou pendant la sauvegarde).

@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import {
+  ArrowLeftRight,
   Bookmark,
   ChevronDown,
   ChevronLeft,
@@ -18,7 +19,7 @@ import {
 } from 'lucide-react'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
 import { useWatchStore } from '../../stores/watchStore'
-import { buildRunModel, CATEGORIES, valueAt, type StepCategory } from '../../lib/runModel'
+import { CATEGORIES, getRunModel, valueAt, type StepCategory } from '../../lib/runModel'
 import TreeMenu, { type MenuItem } from '../connections/TreeMenu'
 import StepTrack, { type ColorMode } from './StepTrack'
 import StepJournal from './StepJournal'
@@ -66,7 +67,8 @@ export default function Timeline({
   const source = useReplayStore((s) => s.source)
   const bookmarks = useReplayStore((s) => s.bookmarks)
   const currentStep = useReplayStore((s) => s.currentStep)
-  const { select, next, prev, first, last, setBookmark } = useReplayStore.getState()
+  const compareFrom = useReplayStore((s) => s.compareFrom)
+  const { select, next, prev, first, last, setBookmark, setCompareFrom } = useReplayStore.getState()
   const marked = useWatchStore((s) => s.marked)
   const colorOf = useWatchStore((s) => s.colorOf)
 
@@ -83,7 +85,7 @@ export default function Timeline({
 
   // En session live, les étapes arrivent en rafale : le modèle suit sans bloquer l'interface.
   const run = useDeferredValue(liveRun)
-  const model = useMemo(() => (run ? buildRunModel(run, source) : null), [run, source])
+  const model = useMemo(() => (run ? getRunModel(run, source) : null), [run, source])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -167,6 +169,8 @@ export default function Timeline({
 
   const n = model.steps.length
   const cur = Math.min(currentStep, n - 1)
+  /** Point A de la comparaison (une étape qui existe dans cette exécution) */
+  const pinned = compareFrom !== null && compareFrom < n ? compareFrom : null
   const info = model.steps[cur]
   const curMark = bookmarks[cur]
 
@@ -240,7 +244,19 @@ export default function Timeline({
       icon: Trash2,
       disabled: !bookmarks[step],
       onClick: () => setBookmark(step, '')
-    }
+    },
+    'sep',
+    {
+      label:
+        step === cur
+          ? 'Comparer à partir de cette étape'
+          : `Comparer avec l'étape courante (${cur + 1})`,
+      icon: ArrowLeftRight,
+      onClick: () => setCompareFrom(step)
+    },
+    ...(compareFrom !== null
+      ? [{ label: 'Arrêter la comparaison', icon: X, onClick: () => setCompareFrom(null) }]
+      : [])
   ]
 
   const chips: { id: StepFilter; label: string; count: number; swatch?: string; tip: string }[] = [
@@ -332,6 +348,33 @@ export default function Timeline({
             <Bookmark size={14} aria-hidden="true" />
             {curMark ? 'Renommer ce moment' : 'Nommer ce moment'}
           </button>
+        )}
+
+        {pinned === null ? (
+          <button
+            type="button"
+            className="dr-btn"
+            onClick={() => setCompareFrom(cur)}
+            data-tip="Épingler cette étape (point A), puis se déplacer : l'onglet Comparer montre ce qui a changé entre les deux — variables et tables suivies"
+          >
+            <ArrowLeftRight size={14} aria-hidden="true" />
+            Comparer
+          </button>
+        ) : (
+          <span className="dr-compare-chip" data-tip="Comparaison en cours : voir l'onglet Comparer">
+            <ArrowLeftRight size={13} aria-hidden="true" />
+            A : étape {pinned + 1}
+            <span className="dr-compare-sep">↔</span>
+            B : étape {cur + 1}
+            <button
+              type="button"
+              onClick={() => setCompareFrom(null)}
+              aria-label="Arrêter la comparaison"
+              data-tip="Arrêter la comparaison"
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          </span>
         )}
 
         <span className="dr-seg" role="group" aria-label="Couleur des barres">
@@ -446,6 +489,7 @@ export default function Timeline({
         model={model}
         current={cur}
         bookmarks={bookmarks}
+        compareFrom={pinned}
         colorMode={colorMode}
         matches={matches}
         watchColors={watchColors}
@@ -555,6 +599,7 @@ export default function Timeline({
           model={model}
           current={cur}
           bookmarks={bookmarks}
+          compareFrom={pinned}
           filtered={filtered}
           followVar={followed?.name ?? null}
           matches={matches}
