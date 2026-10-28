@@ -7,3 +7,6 @@ sidecar/**/obj/
 *.log
 .DS_Store
 *.bak
+
+# Vidéo de présentation : la version muette est intermédiaire (render.cjs), régénérable
+marketing/gtrace-presentation-muette.mp4
