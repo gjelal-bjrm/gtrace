@@ -1,4 +1,5 @@
 import type { JSX } from 'react'
+import { useCursorStore } from '../../stores/cursorStore'
 
 /**
  * Barre d'état générale, tout en bas de la fenêtre, comme celle de SSMS :
@@ -7,7 +8,6 @@ import type { JSX } from 'react'
  */
 export default function MainStatusBar({
   busy,
-  cursor,
   selectionLines,
   engineRunning,
   engineVersion,
@@ -15,13 +15,13 @@ export default function MainStatusBar({
   onVersionClick
 }: {
   busy: boolean
-  cursor: { line: number; column: number } | null
   selectionLines: number
   engineRunning: boolean
   engineVersion: string | null
   appVersion: string
   onVersionClick: () => void
 }): JSX.Element {
+  const cursor = useCursorStore((s) => s.cursor)
   return (
     <footer className="main-status">
       <span className="ms-ready">{busy ? 'Exécution en cours…' : 'Prêt'}</span>

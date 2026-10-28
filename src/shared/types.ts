@@ -208,6 +208,8 @@ export interface ResultSetData {
   columns: string[]
   rows: unknown[][]
   stepIndex: number | null
+  /** Nombre réel de lignes quand `rows` a été tronqué (exécution relue depuis l'historique). */
+  totalRows?: number
 }
 
 export interface DebugRequest {

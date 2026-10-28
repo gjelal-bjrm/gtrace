@@ -1,13 +1,14 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX } from 'react'
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react'
 import {
   ArrowLeftRight,
   Bookmark,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
   Flag,
   History,
+  List,
   Pause,
   Play,
   SkipBack,
@@ -56,10 +57,20 @@ function loadSpeed(): number {
  * phrase « ce qui s'est passé ici », piste cliquable, journal en clair.
  * On peut nommer un moment (signet), retrouvé en rouvrant l'exécution.
  */
-export default function Timeline({
+/**
+ * Place prise en bas de la fenêtre : masqué, réduit à une ligne (lecture pas à
+ * pas et ligne courante), ou ouvert (piste, filtres et journal).
+ */
+export type DerouleMode = 'hidden' | 'compact' | 'open'
+
+function Timeline({
+  mode,
+  onMode,
   journalOpen,
   onToggleJournal
 }: {
+  mode: Exclude<DerouleMode, 'hidden'>
+  onMode: (mode: DerouleMode) => void
   journalOpen: boolean
   onToggleJournal: () => void
 }): JSX.Element | null {
@@ -270,24 +281,114 @@ export default function Timeline({
     }))
   ]
 
+  const transportButtons = (
+    <span className="transport-buttons">
+      <button type="button" onClick={first} data-tip="Première étape" data-shortcut="Ctrl+←" aria-label="Première étape">
+        <SkipBack size={14} aria-hidden="true" />
+      </button>
+      <button type="button" onClick={prev} data-tip="Étape précédente" data-shortcut="Maj+F10" aria-label="Étape précédente">
+        <ChevronLeft size={15} aria-hidden="true" />
+      </button>
+      <button type="button" onClick={next} data-tip="Étape suivante" data-shortcut="F10" aria-label="Étape suivante">
+        <ChevronRight size={15} aria-hidden="true" />
+      </button>
+      <button type="button" onClick={last} data-tip="Dernière étape" data-shortcut="Ctrl+→" aria-label="Dernière étape">
+        <SkipForward size={14} aria-hidden="true" />
+      </button>
+    </span>
+  )
+
+  const nowInfo = (
+    <span className="dr-now" aria-live="polite">
+      <strong className="dr-now-step">
+        Étape {cur + 1} / {n}
+      </strong>
+      {curMark && (
+        <span className="dr-mark">
+          <Flag size={11} strokeWidth={2.2} aria-hidden="true" />
+          {curMark}
+        </span>
+      )}
+      <span className="dr-now-line">ligne {info.line}</span>
+      <code className="dr-now-code">{info.code}</code>
+      {info.effect && (
+        <span className={`dr-effect${info.category === 'error' ? ' error' : ''}`} data-tip={info.effect}>
+          {info.effect}
+        </span>
+      )}
+      <span className={`dr-now-ms${info.slow ? ' slow' : ''}`}>
+        <Timer size={12} aria-hidden="true" />
+        {info.durationMs === null ? 'non mesurée' : `${info.durationMs} ms`}
+        {info.slow && ' · lente'}
+      </span>
+    </span>
+  )
+
+  /** Réduire / agrandir / masquer le panneau (coin droit de sa première ligne). */
+  const windowButtons = (
+    <span className="dr-win">
+      {mode === 'open' ? (
+        <button
+          type="button"
+          onClick={() => onMode('compact')}
+          aria-label="Réduire le Déroulé"
+          data-tip="Réduire à une ligne : on garde la lecture pas à pas"
+        >
+          <ChevronsDown size={15} aria-hidden="true" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onMode('open')}
+          aria-label="Ouvrir le Déroulé"
+          data-tip="Ouvrir le Déroulé : piste, filtres et journal"
+        >
+          <ChevronsUp size={15} aria-hidden="true" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onMode('hidden')}
+        aria-label="Masquer le Déroulé"
+        data-tip="Masquer le Déroulé (le réafficher : bouton Déroulé du volet de résultats, ou Affichage)"
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </span>
+  )
+
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>): void => {
+    // F2 depuis la piste ou le journal : nommer l'étape courante.
+    if (e.key === 'F2' && !naming) {
+      e.preventDefault()
+      startNaming(cur)
+    }
+    // Espace : lecture / pause (sauf dans un champ ou sur un bouton, qui gèrent l'espace).
+    const tag = (e.target as HTMLElement).tagName
+    if (e.key === ' ' && !['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(tag)) {
+      e.preventDefault()
+      togglePlay()
+    }
+  }
+
+  if (mode === 'compact') {
+    return (
+      <section className="deroule compact" aria-label="Déroulé de l'exécution" onKeyDown={onKeyDown}>
+        <div className="dr-transport">
+          <span className="dr-title">
+            <History size={15} aria-hidden="true" />
+            Déroulé
+          </span>
+          {transportButtons}
+          {nowInfo}
+          {windowButtons}
+        </div>
+      </section>
+    )
+  }
+
   return (
-    <section
-      className="deroule"
-      aria-label="Déroulé de l'exécution"
-      onKeyDown={(e) => {
-        // F2 depuis la piste ou le journal : nommer l'étape courante.
-        if (e.key === 'F2' && !naming) {
-          e.preventDefault()
-          startNaming(cur)
-        }
-        // Espace : lecture / pause (sauf dans un champ ou sur un bouton, qui gèrent l'espace).
-        const tag = (e.target as HTMLElement).tagName
-        if (e.key === ' ' && !['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(tag)) {
-          e.preventDefault()
-          togglePlay()
-        }
-      }}
-    >
+    <section className="deroule" aria-label="Déroulé de l'exécution" onKeyDown={onKeyDown}>
       <header className="dr-head">
         <span className="dr-title">
           <History size={15} aria-hidden="true" />
@@ -400,34 +501,18 @@ export default function Timeline({
         <button
           type="button"
           className="dr-btn"
-          aria-expanded={journalOpen}
+          aria-pressed={journalOpen}
           onClick={onToggleJournal}
           data-tip={journalOpen ? 'Masquer le journal des étapes' : 'Afficher le journal des étapes'}
         >
-          {journalOpen ? (
-            <ChevronDown size={14} aria-hidden="true" />
-          ) : (
-            <ChevronUp size={14} aria-hidden="true" />
-          )}
+          <List size={14} aria-hidden="true" />
           Journal
         </button>
+        {windowButtons}
       </header>
 
       <div className="dr-transport">
-        <span className="transport-buttons">
-          <button type="button" onClick={first} data-tip="Première étape" data-shortcut="Ctrl+←" aria-label="Première étape">
-            <SkipBack size={14} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={prev} data-tip="Étape précédente" data-shortcut="Maj+F10" aria-label="Étape précédente">
-            <ChevronLeft size={15} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={next} data-tip="Étape suivante" data-shortcut="F10" aria-label="Étape suivante">
-            <ChevronRight size={15} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={last} data-tip="Dernière étape" data-shortcut="Ctrl+→" aria-label="Dernière étape">
-            <SkipForward size={14} aria-hidden="true" />
-          </button>
-        </span>
+        {transportButtons}
         <span className="dr-player">
           <button
             type="button"
@@ -460,29 +545,7 @@ export default function Timeline({
             ×{speed}
           </button>
         </span>
-        <span className="dr-now" aria-live="polite">
-          <strong className="dr-now-step">
-            Étape {cur + 1} / {n}
-          </strong>
-          {curMark && (
-            <span className="dr-mark">
-              <Flag size={11} strokeWidth={2.2} aria-hidden="true" />
-              {curMark}
-            </span>
-          )}
-          <span className="dr-now-line">ligne {info.line}</span>
-          <code className="dr-now-code">{info.code}</code>
-          {info.effect && (
-            <span className={`dr-effect${info.category === 'error' ? ' error' : ''}`} data-tip={info.effect}>
-              {info.effect}
-            </span>
-          )}
-          <span className={`dr-now-ms${info.slow ? ' slow' : ''}`}>
-            <Timer size={12} aria-hidden="true" />
-            {info.durationMs === null ? 'non mesurée' : `${info.durationMs} ms`}
-            {info.slow && ' · lente'}
-          </span>
-        </span>
+        {nowInfo}
       </div>
 
       <StepTrack
@@ -622,3 +685,5 @@ export default function Timeline({
     </section>
   )
 }
+
+export default memo(Timeline)

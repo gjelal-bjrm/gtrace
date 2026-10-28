@@ -1,4 +1,4 @@
-import { useMemo, useState, type JSX } from 'react'
+import { memo, useMemo, useState, type JSX } from 'react'
 import { ArrowLeftRight, ArrowRight, Flag } from 'lucide-react'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
 import { CATEGORIES, getRunModel } from '../../lib/runModel'
@@ -15,7 +15,7 @@ const plural = (n: number, word: string): string => `${n} ${word}${n > 1 ? 's' :
  * Déroulé (A) et l'étape courante (B) — variables, puis contenu des tables
  * suivies. On se déplace dans le Déroulé, la comparaison suit.
  */
-export default function ComparePanel(): JSX.Element {
+function ComparePanel(): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const source = useReplayStore((s) => s.source)
   const currentStep = useReplayStore((s) => s.currentStep)
@@ -242,3 +242,5 @@ function TableBlock({ t }: { t: TableDiff }): JSX.Element {
     </div>
   )
 }
+
+export default memo(ComparePanel)

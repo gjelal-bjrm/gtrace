@@ -1,17 +1,44 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { HistoryEntry, HistoryEntrySummary, HistorySaveInput } from '@shared/types'
 
 const MAX_ENTRIES = 50
+/**
+ * Lignes conservées par jeu de résultats : la grille n'en affiche que 500, et
+ * un SELECT de 100 000 lignes enregistré tel quel rendait chaque exécution
+ * suivante lente (fichiers de plusieurs Mo écrits puis relus).
+ */
+const MAX_STORED_ROWS = 1000
+
+interface CachedSummary {
+  mtimeMs: number
+  size: number
+  summary: HistoryEntrySummary
+}
 
 /**
  * Historique des sessions de debug (spec Phase 4) : un fichier JSON par session
  * dans userData/sessions — rejouer une session passée sans réexécuter.
  * (La spec prévoit SQLite ; le format fichier suffit au MVP et évite le build
  * natif better-sqlite3 — à migrer si le volume l'exige.)
+ *
+ * Le résumé de chaque fichier est mis en cache, repéré par sa date et sa taille :
+ * lister l'historique ne relit que les fichiers nouveaux ou modifiés (y compris
+ * par un autre processus, comme le serveur MCP).
  */
 export class HistoryStore {
+  private readonly summaries = new Map<string, CachedSummary>()
+
   constructor(private readonly dir: string) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   }
@@ -27,17 +54,39 @@ export class HistoryStore {
       errorCount: countErrors(input.run),
       sql: input.sql,
       paramValues: input.paramValues,
-      run: input.run
+      run: { ...input.run, resultsets: input.run.resultsets.map(trimRows) }
     }
-    writeFileSync(join(this.dir, `${entry.id}.json`), JSON.stringify(entry), 'utf8')
+    const name = `${entry.id}.json`
+    writeFileSync(join(this.dir, name), JSON.stringify(entry), 'utf8')
+    const summary = this.toSummary(entry)
+    this.remember(name, summary)
     this.prune()
-    return this.toSummary(entry)
+    return summary
   }
 
   list(): HistoryEntrySummary[] {
-    return this.readAll()
-      .map((e) => this.toSummary(e))
-      .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
+    const files = readdirSync(this.dir).filter((f) => f.endsWith('.json'))
+    for (const known of this.summaries.keys()) {
+      if (!files.includes(known)) this.summaries.delete(known)
+    }
+    const out: HistoryEntrySummary[] = []
+    for (const file of files) {
+      const path = join(this.dir, file)
+      try {
+        const st = statSync(path)
+        const cached = this.summaries.get(file)
+        if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) {
+          out.push(cached.summary)
+          continue
+        }
+        const summary = this.toSummary(JSON.parse(readFileSync(path, 'utf8')) as HistoryEntry)
+        this.summaries.set(file, { mtimeMs: st.mtimeMs, size: st.size, summary })
+        out.push(summary)
+      } catch {
+        /* fichier corrompu ou supprimé entre-temps : ignoré */
+      }
+    }
+    return out.sort((a, b) => b.savedAt.localeCompare(a.savedAt))
   }
 
   load(id: string): HistoryEntry {
@@ -73,22 +122,18 @@ export class HistoryStore {
   }
 
   private prune(): void {
-    const all = this.readAll().sort((a, b) => b.savedAt.localeCompare(a.savedAt))
-    for (const stale of all.slice(MAX_ENTRIES)) {
+    for (const stale of this.list().slice(MAX_ENTRIES)) {
       this.delete(stale.id)
     }
   }
 
-  private readAll(): HistoryEntry[] {
-    const entries: HistoryEntry[] = []
-    for (const file of readdirSync(this.dir).filter((f) => f.endsWith('.json'))) {
-      try {
-        entries.push(JSON.parse(readFileSync(join(this.dir, file), 'utf8')) as HistoryEntry)
-      } catch {
-        /* fichier corrompu : ignoré */
-      }
+  private remember(file: string, summary: HistoryEntrySummary): void {
+    try {
+      const st = statSync(join(this.dir, file))
+      this.summaries.set(file, { mtimeMs: st.mtimeMs, size: st.size, summary })
+    } catch {
+      /* relu au prochain list() */
     }
-    return entries
   }
 
   private toSummary(entry: HistoryEntry): HistoryEntrySummary {
@@ -102,6 +147,11 @@ export class HistoryStore {
       errorCount: entry.errorCount ?? countErrors(entry.run)
     }
   }
+}
+
+function trimRows(rs: HistoryEntry['run']['resultsets'][number]): HistoryEntry['run']['resultsets'][number] {
+  if (rs.rows.length <= MAX_STORED_ROWS) return rs
+  return { ...rs, rows: rs.rows.slice(0, MAX_STORED_ROWS), totalRows: rs.totalRows ?? rs.rows.length }
 }
 
 function countErrors(run: HistoryEntry['run']): number {

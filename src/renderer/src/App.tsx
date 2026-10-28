@@ -15,6 +15,7 @@ import {
   FilePlus,
   FolderOpen,
   Gauge,
+  History,
   Info,
   LayoutTemplate,
   LoaderCircle,
@@ -60,7 +61,7 @@ import type {
   XeLineStat
 } from '@shared/types'
 import CodeEditor, { type LineDecoration, type LinePasses } from './components/editor/CodeEditor'
-import Timeline from './components/timeline/Timeline'
+import Timeline, { type DerouleMode } from './components/timeline/Timeline'
 import VariablesPanel from './components/panels/VariablesPanel'
 import MessagesPanel from './components/panels/MessagesPanel'
 import ResultsPanel from './components/panels/ResultsPanel'
@@ -102,6 +103,7 @@ import WhatsNew from './components/layout/WhatsNew'
 import { useUpdateStore } from './stores/updateStore'
 import { setCompletionSchema } from './components/editor/completion'
 import { useReplayStore } from './stores/replayStore'
+import { useCursorStore } from './stores/cursorStore'
 
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
 /** Barres d'outils affichées (Affichage › Barres d'outils), mémorisées. */
@@ -221,8 +223,6 @@ export default function App(): JSX.Element {
   const [runStartedAt, setRunStartedAt] = useState<Date | null>(null)
   /** Dernière exécution arrêtée par l'utilisateur (« Requête annulée. »). */
   const [cancelled, setCancelled] = useState(false)
-  /** Position du curseur dans l'éditeur (Ln / Col de la barre d'état). */
-  const [cursor, setCursor] = useState<{ line: number; column: number } | null>(null)
   /** Échec avant tout résultat (syntaxe, connexion…) : affiché dans Messages. */
   const [execError, setExecError] = useState<string | null>(null)
   /** Double-clic sur une erreur → sélection de la ligne dans l'éditeur. */
@@ -231,10 +231,7 @@ export default function App(): JSX.Element {
     (line: number) => setSelectLineReq((p) => ({ line, seq: (p?.seq ?? 0) + 1 })),
     []
   )
-  const onCursorChange = useCallback(
-    (line: number, column: number) => setCursor({ line, column }),
-    []
-  )
+  const setCursor = useCursorStore((s) => s.setCursor)
   /** Ctrl+R : volet de résultats masqué (l'éditeur prend toute la hauteur). */
   const [resultsHidden, setResultsHidden] = useState(false)
   const [showExplorer, setShowExplorer] = useState(true)
@@ -243,6 +240,9 @@ export default function App(): JSX.Element {
     localStorage.setItem('gtrace.toolbars', JSON.stringify(toolbars))
   }, [toolbars])
   const [showConnect, setShowConnect] = useState(false)
+  // Fonctions stables : les panneaux mémorisés ne se redessinent pas pour rien.
+  const openConnect = useCallback(() => setShowConnect(true), [])
+  const hideExplorer = useCallback(() => setShowExplorer(false), [])
   /** Résultats agrandis : masque l'éditeur pour donner toute la place aux données. */
   const [focusMode, setFocusMode] = useState(false)
   const [showTheme, setShowTheme] = useState(false)
@@ -272,6 +272,15 @@ export default function App(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('gtrace.deroule.journal', journalOpen ? '1' : '0')
   }, [journalOpen])
+  const toggleJournal = useCallback(() => setJournalOpen((o) => !o), [])
+  /** Déroulé masqué, réduit à une ligne ou ouvert (mémorisé entre sessions). */
+  const [derouleMode, setDerouleMode] = useState<DerouleMode>(() => {
+    const saved = localStorage.getItem('gtrace.deroule.mode')
+    return saved === 'hidden' || saved === 'compact' ? saved : 'open'
+  })
+  useEffect(() => {
+    localStorage.setItem('gtrace.deroule.mode', derouleMode)
+  }, [derouleMode])
   useEffect(() => {
     localStorage.setItem('gtrace.explorerW', String(explorerWidth))
   }, [explorerWidth])
@@ -1417,10 +1426,8 @@ export default function App(): JSX.Element {
   }, [])
 
   // F9 : poser / retirer un point d'arrêt sur la ligne du curseur.
-  const cursorRef = useRef(cursor)
-  cursorRef.current = cursor
   const toggleBreakpointAtCursor = useCallback(() => {
-    const line = cursorRef.current?.line
+    const line = useCursorStore.getState().cursor?.line
     if (line) toggleBreakpoint(line)
   }, [toggleBreakpoint])
   useEffect(() => {
@@ -1489,6 +1496,8 @@ export default function App(): JSX.Element {
       setBusy(false)
     }
   }, [activeRef, activeConn, activeTab.connectionId, tabDatabase, compatLevel, resetDerived])
+
+  const onOpenProcedure = useCallback(() => void openCalledProcedure(), [openCalledProcedure])
 
   // Un « USE MaBase » exécuté change la base de l'onglet, comme dans SSMS :
   // la liste des bases et les exécutions suivantes suivent.
@@ -1660,6 +1669,7 @@ export default function App(): JSX.Element {
     setResultsHeight(300)
     setTimelineHeight(320)
     setJournalOpen(true)
+    setDerouleMode('open')
     setShowExplorer(true)
     setResultsHidden(false)
     setFocusMode(false)
@@ -1740,6 +1750,15 @@ export default function App(): JSX.Element {
         { label: "Explorateur d'objets", icon: PanelLeft, shortcut: 'F8', checked: showExplorer, onClick: () => setShowExplorer((v) => !v) },
         { label: 'Volet de résultats', icon: PanelBottom, shortcut: 'Ctrl+R', checked: !resultsHidden, onClick: () => setResultsHidden((h) => !h) },
         { label: 'Agrandir les résultats', icon: Maximize2, checked: focusMode, onClick: () => setFocusMode((f) => !f) },
+        {
+          label: "Déroulé de l'exécution",
+          icon: History,
+          children: [
+            { label: 'Ouvert', checked: derouleMode === 'open', onClick: () => setDerouleMode('open') },
+            { label: 'Réduit (une ligne)', checked: derouleMode === 'compact', onClick: () => setDerouleMode('compact') },
+            { label: 'Masqué', checked: derouleMode === 'hidden', onClick: () => setDerouleMode('hidden') }
+          ]
+        },
         {
           label: "Barres d'outils",
           children: [
@@ -2007,11 +2026,11 @@ export default function App(): JSX.Element {
             <aside className="dock-left" style={{ width: explorerWidth }}>
               <ObjectExplorer
                 onOpenScript={onOpenScript}
-                onConnect={() => setShowConnect(true)}
+                onConnect={openConnect}
                 onDisconnect={onDisconnect}
                 onNewQuery={onNewQuery}
                 onNotice={setNotice}
-                onHide={() => setShowExplorer(false)}
+                onHide={hideExplorer}
                 locked={locked}
               />
               <HistoryPanel
@@ -2131,7 +2150,7 @@ export default function App(): JSX.Element {
                     hiddenRanges={hiddenRanges}
                     onSelectionChange={onEditorSelection}
                     selectLine={selectLineReq}
-                    onCursorChange={onCursorChange}
+                    onCursorChange={setCursor}
                   />
                 </div>
               </section>
@@ -2163,6 +2182,17 @@ export default function App(): JSX.Element {
               {resultTab('inspect', ScanSearch, 'Inspect', 'Vos propres requêtes, réévaluées à chaque pause du débogage')}
               {resultTab('profile', Gauge, 'Profil', 'Temps passé par ligne — se remplit après « Profiler »')}
               <span className="results-spacer" />
+              {derouleMode === 'hidden' && run && run.steps.length > 0 && (
+                <button
+                  type="button"
+                  className="results-action icon"
+                  onClick={() => setDerouleMode('compact')}
+                  data-tip="Réafficher le Déroulé de l'exécution (réduit à une ligne)"
+                  aria-label="Réafficher le Déroulé de l'exécution"
+                >
+                  <History size={14} aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 className={`results-action${focusMode ? ' active' : ''}`}
@@ -2203,7 +2233,7 @@ export default function App(): JSX.Element {
                 />
               )}
               {tab === 'variables' && (
-                <VariablesPanel onOpenProcedure={() => void openCalledProcedure()} />
+                <VariablesPanel onOpenProcedure={onOpenProcedure} />
               )}
               {tab === 'results' && <ResultsPanel />}
               {tab === 'messages' && <MessagesPanel messages={messages} onGoToLine={goToLine} />}
@@ -2229,16 +2259,23 @@ export default function App(): JSX.Element {
 
           {/* Pas de Déroulé vide (pause avant la première instruction). Journal
               replié : le panneau prend sa hauteur naturelle, sans poignée. */}
-          {run && run.steps.length > 0 && (
+          {run && run.steps.length > 0 && derouleMode !== 'hidden' && (
             <>
-              {journalOpen && (
+              {derouleMode === 'open' && journalOpen && (
                 <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 220, 640))} />
               )}
               <div
-                className={`timeline-container${journalOpen ? '' : ' collapsed'}`}
-                style={journalOpen ? { height: timelineHeight } : undefined}
+                className={`timeline-container${
+                  derouleMode === 'compact' ? ' compact' : journalOpen ? '' : ' collapsed'
+                }`}
+                style={derouleMode === 'open' && journalOpen ? { height: timelineHeight } : undefined}
               >
-                <Timeline journalOpen={journalOpen} onToggleJournal={() => setJournalOpen((o) => !o)} />
+                <Timeline
+                  mode={derouleMode}
+                  onMode={setDerouleMode}
+                  journalOpen={journalOpen}
+                  onToggleJournal={toggleJournal}
+                />
               </div>
             </>
           )}
@@ -2259,7 +2296,6 @@ export default function App(): JSX.Element {
 
       <MainStatusBar
         busy={running && !paused}
-        cursor={cursor}
         selectionLines={selectionLines}
         engineRunning={status?.running ?? false}
         engineVersion={status?.version ?? null}

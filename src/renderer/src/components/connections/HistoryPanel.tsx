@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react'
+import { memo, useEffect, useState, type JSX } from 'react'
 import { History, TriangleAlert, X } from 'lucide-react'
 import type { HistoryEntry, HistoryEntrySummary } from '@shared/types'
 import DockPanel from '../layout/DockPanel'
@@ -18,7 +18,7 @@ interface Props {
  * Replié par défaut : c'est un outil qu'on va chercher, pas une information
  * dont on a besoin en permanence. L'état d'ouverture est mémorisé.
  */
-export default function HistoryPanel({ onLoadHistory, version, locked }: Props): JSX.Element {
+function HistoryPanel({ onLoadHistory, version, locked }: Props): JSX.Element {
   const [history, setHistory] = useState<HistoryEntrySummary[]>([])
   const [open, setOpen] = useState(() => localStorage.getItem('gtrace.historyOpen') === '1')
 
@@ -96,3 +96,5 @@ export default function HistoryPanel({ onLoadHistory, version, locked }: Props):
     </DockPanel>
   )
 }
+
+export default memo(HistoryPanel)

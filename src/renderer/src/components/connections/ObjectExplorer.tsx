@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -166,7 +167,7 @@ interface Menu {
   items: MenuItem[]
 }
 
-export default function ObjectExplorer({
+function ObjectExplorer({
   onOpenScript,
   onConnect,
   onDisconnect,
@@ -834,3 +835,5 @@ export default function ObjectExplorer({
 function indent(depth: number): CSSProperties {
   return { paddingLeft: `${4 + depth * 16}px`, '--depth': depth } as CSSProperties
 }
+
+export default memo(ObjectExplorer)

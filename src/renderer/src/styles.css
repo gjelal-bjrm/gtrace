@@ -856,8 +856,25 @@ th {
 }
 
 /* Zébrage discret (désactivé pour les snapshots qui colorent le diff). */
-.data-grid:not(.snap-grid) tbody tr:nth-child(even) td {
+.data-grid:not(.snap-grid):not(.virtual) tbody tr:nth-child(even) td,
+.data-grid.virtual tbody tr.zebra td {
   background: var(--zebra);
+}
+
+/* Grille virtualisée : largeurs calculées (colgroup), une seule ligne par rangée. */
+.data-grid.virtual {
+  table-layout: fixed;
+}
+
+.data-grid.virtual td {
+  max-width: none;
+}
+
+.data-grid tbody tr.grid-spacer td,
+.data-grid tbody tr.grid-spacer:hover td {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .data-grid tbody tr:hover td {

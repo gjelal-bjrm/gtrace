@@ -1,10 +1,10 @@
-import type { JSX } from 'react'
+import { memo, type JSX } from 'react'
 import { formatSqlValue, useReplayStore, variablesAt } from '../../stores/replayStore'
 import { useWatchStore } from '../../stores/watchStore'
 import { FolderOpen, Variable } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 
-export default function VariablesPanel({
+function VariablesPanel({
   onOpenProcedure
 }: {
   /** Ouvre le corps de la procédure appelée, paramètres repris de l'appel. */
@@ -148,3 +148,5 @@ export default function VariablesPanel({
     </div>
   )
 }
+
+export default memo(VariablesPanel)

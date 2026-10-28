@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import type { TableSnapshot } from '@shared/types'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
 import { Camera } from 'lucide-react'
@@ -17,7 +17,7 @@ function diff(current: TableSnapshot, previous: TableSnapshot | null): DiffedSna
   return { snapshot: current, previous, ...multisetDiff(current.rows, previous?.rows ?? []) }
 }
 
-export default function SnapshotsPanel(): JSX.Element {
+function SnapshotsPanel(): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
 
@@ -134,3 +134,5 @@ export default function SnapshotsPanel(): JSX.Element {
     </div>
   )
 }
+
+export default memo(SnapshotsPanel)

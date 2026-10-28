@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { RunMessage } from '../../lib/messages'
 import { MessageSquareText } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
@@ -8,7 +8,7 @@ import EmptyState from '../ui/EmptyState'
  * heure de fin. Double-cliquer sur une erreur sélectionne la ligne fautive
  * dans l'éditeur.
  */
-export default function MessagesPanel({
+function MessagesPanel({
   messages,
   onGoToLine
 }: {
@@ -43,3 +43,5 @@ export default function MessagesPanel({
     </div>
   )
 }
+
+export default memo(MessagesPanel)

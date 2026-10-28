@@ -1,9 +1,10 @@
+import { memo } from 'react'
 import { useReplayStore } from '../../stores/replayStore'
 import DataGrid from './DataGrid'
 import { Table2 } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 
-export default function ResultsPanel(): JSX.Element {
+function ResultsPanel(): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
   const select = useReplayStore((s) => s.select)
@@ -31,7 +32,8 @@ export default function ResultsPanel(): JSX.Element {
           className={`resultset${rs.stepIndex === currentStep ? ' resultset-current' : ''}`}
         >
           <h3>
-            Jeu de résultats {rs.index + 1} · {rs.rows.length} ligne{rs.rows.length > 1 ? 's' : ''}
+            Jeu de résultats {rs.index + 1} · {rs.totalRows ?? rs.rows.length} ligne
+            {(rs.totalRows ?? rs.rows.length) > 1 ? 's' : ''}
             {rs.stepIndex !== null && (
               <button
                 className="link-btn"
@@ -42,9 +44,17 @@ export default function ResultsPanel(): JSX.Element {
               </button>
             )}
           </h3>
-          <DataGrid columns={rs.columns} rows={rs.rows} name={`gtrace-resultset-${rs.index + 1}`} />
+          <DataGrid
+            columns={rs.columns}
+            rows={rs.rows}
+            totalRows={rs.totalRows}
+            name={`gtrace-resultset-${rs.index + 1}`}
+          />
         </div>
       ))}
     </div>
   )
 }
+
+/** Sans propriétés : ne se redessine que si l'exécution ou l'étape courante change. */
+export default memo(ResultsPanel)

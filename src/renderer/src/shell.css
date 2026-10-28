@@ -1679,6 +1679,47 @@ button.tree-twisty:hover:not(:disabled) {
   height: auto;
 }
 
+/* Réduit : une seule ligne (lecture pas à pas et ligne courante). */
+.timeline-container.compact {
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.timeline-container.compact .deroule {
+  height: auto;
+}
+
+.deroule.compact .dr-transport {
+  min-height: 32px;
+  padding: 2px 8px 2px 12px;
+}
+
+/* Réduire / ouvrir / masquer, au bout de la première ligne du panneau */
+.dr-win {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.dr-win button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.dr-win button:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
 .dr-head {
   display: flex;
   align-items: center;
@@ -1742,6 +1783,12 @@ button.tree-twisty:hover:not(:disabled) {
 
 .dr-btn.primary:hover {
   filter: brightness(1.08);
+}
+
+/* Journal affiché */
+.dr-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Bascule Couleur : Type | Durée */

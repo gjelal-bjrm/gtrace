@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { copyText } from '../../lib/clipboard'
 
 /**
@@ -15,6 +15,10 @@ import { copyText } from '../../lib/clipboard'
  *   colonne sélectionnée, sinon les lignes sélectionnées, sinon tout. NULL est
  *   copié en toutes lettres, comme SSMS.
  * - Clic droit : menu (copier avec/sans en-têtes, colorer, exporter CSV/JSON/Excel).
+ * - Toutes les lignes sont consultables, mais seules celles à l'écran existent
+ *   dans la page (grille « virtualisée ») : 20 000 cellules à mettre en page
+ *   figeaient la fenêtre près d'une seconde après chaque SELECT. Les largeurs de
+ *   colonnes sont donc calculées d'après le texte, et non laissées au navigateur.
  */
 
 const PALETTE = [
@@ -77,18 +81,84 @@ interface Menu {
   row: number | null
 }
 
-export default function DataGrid({
+/** Lignes créées en plus au-dessus et en dessous de la zone visible (défilement fluide). */
+const OVERSCAN = 20
+/** Lignes lues pour estimer la largeur des colonnes. */
+const WIDTH_SAMPLE = 1000
+/** Largeur maximale d'une colonne (au-delà, le texte est coupé « … »). */
+const MAX_COL_PX = 380
+/** Marges intérieures + bordure d'une cellule. */
+const CELL_EXTRA_PX = 22
+
+/** Largeur d'un caractère de la police à chasse fixe de la grille. */
+function charWidth(font: string): number {
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return 7.2
+  ctx.font = font
+  return ctx.measureText('0000000000').width / 10 || 7.2
+}
+
+/**
+ * Une ligne de la grille, redessinée seulement si ses valeurs, sa couleur ou la
+ * colonne sélectionnée changent : colorer une ligne ne reconstruit plus les
+ * milliers de cellules des autres.
+ */
+const GridRow = memo(function GridRow({
+  row,
+  ri,
+  color,
+  selectedCol,
+  onRowNum
+}: {
+  row: unknown[]
+  ri: number
+  color: number | undefined
+  selectedCol: number | null
+  onRowNum: (ri: number) => void
+}): JSX.Element {
+  const bg = color !== undefined ? PALETTE[color] : undefined
+  return (
+    <tr
+      data-row={ri}
+      className={`${ri % 2 === 1 ? 'zebra' : ''}${color !== undefined ? ' row-marked' : ''}`}
+    >
+      <td
+        className="grid-rownum clickable"
+        title="Colorer / sélectionner la ligne (re-cliquer pour changer / réinitialiser)"
+        onClick={() => onRowNum(ri)}
+      >
+        {ri + 1}
+      </td>
+      {row.map((cell, ci) => {
+        const t = cellText(cell)
+        return (
+          <td
+            key={ci}
+            className={`${cellClass(cell)}${selectedCol === ci ? ' col-selected' : ''}`}
+            title={t}
+            style={bg ? { background: bg } : undefined}
+          >
+            {t}
+          </td>
+        )
+      })}
+    </tr>
+  )
+})
+
+function DataGrid({
   columns,
   rows,
-  maxRows = 500,
+  totalRows,
   name = 'resultset'
 }: {
   columns: string[]
   rows: unknown[][]
-  maxRows?: number
+  /** Nombre réel de lignes quand `rows` est tronqué (exécution relue depuis l'historique) */
+  totalRows?: number
   name?: string
 }): JSX.Element {
-  const shown = rows.slice(0, maxRows)
+  const shown = rows
   const [rowColor, setRowColor] = useState<Map<number, number>>(() => new Map())
   const [menu, setMenu] = useState<Menu | null>(null)
   /** Colonne sélectionnée par un clic sur son en-tête (null = aucune). */
@@ -105,6 +175,7 @@ export default function DataGrid({
   const nextColorRef = useRef(0)
 
   const cycleRow = useCallback((i: number) => {
+    setSelectedCol(null)
     setRowColor((prev) => {
       const next = new Map(prev)
       if (next.has(i)) {
@@ -204,6 +275,65 @@ export default function DataGrid({
     return () => el.removeEventListener('keydown', onKey)
   }, [doCopy])
 
+  // ─── Virtualisation : seules les lignes visibles (± OVERSCAN) sont créées ───
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const [view, setView] = useState({ top: 0, height: 600 })
+  const [rowH, setRowH] = useState(24)
+  const [charW, setCharW] = useState(7.2)
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = (): void =>
+      setView((v) =>
+        v.top === el.scrollTop && v.height === el.clientHeight
+          ? v
+          : { top: el.scrollTop, height: el.clientHeight }
+      )
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    el.addEventListener('scroll', update, { passive: true })
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  // Police réelle de la grille (thème, densité) → largeur d'un caractère.
+  useLayoutEffect(() => {
+    if (tableRef.current) setCharW(charWidth(getComputedStyle(tableRef.current).font))
+  }, [])
+
+  // Hauteur réelle d'une ligne (dépend de la densité choisie dans Apparence).
+  useLayoutEffect(() => {
+    const tr = tableRef.current?.querySelector<HTMLTableRowElement>('tbody tr[data-row]')
+    const h = tr?.getBoundingClientRect().height
+    if (h && Math.abs(h - rowH) > 0.5) setRowH(h)
+  })
+
+  const colWidths = useMemo(() => {
+    const sample = rows.length > WIDTH_SAMPLE ? rows.slice(0, WIDTH_SAMPLE) : rows
+    const px = (chars: number): number =>
+      Math.min(MAX_COL_PX, Math.max(48, Math.ceil(chars * charW) + CELL_EXTRA_PX))
+    return {
+      rownum: Math.max(40, Math.ceil(String(rows.length).length * charW) + CELL_EXTRA_PX),
+      cols: columns.map((c, ci) => {
+        let len = (c || `(col ${ci + 1})`).length + 1
+        for (const r of sample) {
+          const t = cellText(r[ci]).length
+          if (t > len) len = t
+          if (len * charW >= MAX_COL_PX) break
+        }
+        return px(len)
+      })
+    }
+  }, [columns, rows, charW])
+
+  const first = Math.max(0, Math.floor(view.top / rowH) - OVERSCAN)
+  const last = Math.min(shown.length, Math.ceil((view.top + view.height) / rowH) + OVERSCAN)
+
   const menuTargets = (): number[] => {
     const marked = [...rowColor.keys()]
     if (marked.length > 0) return marked
@@ -212,9 +342,11 @@ export default function DataGrid({
 
   return (
     <div className="grid-block" ref={wrapRef} tabIndex={0}>
-      <div className="grid-scroll">
+      <div className="grid-scroll" ref={scrollRef}>
         <table
-          className="data-grid"
+          ref={tableRef}
+          className="data-grid virtual"
+          style={{ width: colWidths.rownum + colWidths.cols.reduce((a, w) => a + w, 0) }}
           onContextMenu={(e) => {
             e.preventDefault()
             const tr = (e.target as HTMLElement).closest('tr[data-row]')
@@ -222,6 +354,12 @@ export default function DataGrid({
             setMenu({ x: e.clientX, y: e.clientY, row })
           }}
         >
+          <colgroup>
+            <col style={{ width: colWidths.rownum }} />
+            {colWidths.cols.map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th
@@ -250,43 +388,33 @@ export default function DataGrid({
             </tr>
           </thead>
           <tbody>
-            {shown.map((row, ri) => {
-              const color = rowColor.get(ri)
-              const bg = color !== undefined ? PALETTE[color] : undefined
-              return (
-                <tr key={ri} data-row={ri} className={color !== undefined ? 'row-marked' : ''}>
-                  <td
-                    className="grid-rownum clickable"
-                    title="Colorer / sélectionner la ligne (re-cliquer pour changer / réinitialiser)"
-                    onClick={() => {
-                      setSelectedCol(null)
-                      cycleRow(ri)
-                    }}
-                  >
-                    {ri + 1}
-                  </td>
-                  {row.map((cell, ci) => {
-                    const t = cellText(cell)
-                    return (
-                      <td
-                        key={ci}
-                        className={`${cellClass(cell)}${selectedCol === ci ? ' col-selected' : ''}`}
-                        title={t}
-                        style={{ background: bg }}
-                      >
-                        {t}
-                      </td>
-                    )
-                  })}
-                </tr>
-              )
-            })}
+            {first > 0 && (
+              <tr className="grid-spacer" aria-hidden="true" style={{ height: first * rowH }}>
+                <td colSpan={columns.length + 1} />
+              </tr>
+            )}
+            {shown.slice(first, last).map((row, k) => (
+              <GridRow
+                key={first + k}
+                row={row}
+                ri={first + k}
+                color={rowColor.get(first + k)}
+                selectedCol={selectedCol}
+                onRowNum={cycleRow}
+              />
+            ))}
+            {last < shown.length && (
+              <tr className="grid-spacer" aria-hidden="true" style={{ height: (shown.length - last) * rowH }}>
+                <td colSpan={columns.length + 1} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      {rows.length > maxRows && (
+      {totalRows !== undefined && totalRows > rows.length && (
         <p className="hint grid-more">
-          … {rows.length - maxRows} ligne(s) non affichée(s) (l&apos;export inclut tout)
+          … {totalRows - rows.length} ligne(s) non conservée(s) : l&apos;historique garde les{' '}
+          {rows.length} premières. Réexécutez pour tout voir et tout exporter.
         </p>
       )}
 
@@ -349,3 +477,5 @@ export default function DataGrid({
     </div>
   )
 }
+
+export default memo(DataGrid)
