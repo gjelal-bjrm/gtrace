@@ -33,9 +33,11 @@ function createWindow(connectionId?: string | null): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#16181d',
+    // .ico multi-tailles : la barre de titre et la barre des tâches prennent
+    // la version dessinée pour les petites tailles, pas une réduction floue.
     icon: app.isPackaged
-      ? join(process.resourcesPath, 'icon.png')
-      : join(app.getAppPath(), 'build', 'icon.png'),
+      ? join(process.resourcesPath, 'icon.ico')
+      : join(app.getAppPath(), 'build', 'icon.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

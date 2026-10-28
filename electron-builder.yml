@@ -37,16 +37,18 @@ files:
 
 # Le sidecar ScriptDom (publish self-contained win-x64) et l'icône runtime
 # vivent hors asar : le main le lance via process.resourcesPath/sidecar/.
+# L'icône est un .ico multi-tailles (npm run gen:icon) : Windows y prend la
+# version simplifiée en petit (barre de titre, barre des tâches).
 extraResources:
   - from: resources/sidecar
     to: sidecar
-  - from: build/icon.png
-    to: icon.png
+  - from: build/icon.ico
+    to: icon.ico
 
 win:
   target:
     - nsis
-  icon: build/icon.png
+  icon: build/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
 
 nsis:

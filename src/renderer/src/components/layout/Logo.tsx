@@ -1,55 +1,30 @@
-import type { JSX } from 'react'
+import { useId, useMemo, type JSX } from 'react'
+import logoSmall from '../../assets/logo-small.svg?raw'
 
 /**
- * Icône GTrace « G-rewind » : arc ambre (retour en arrière) dont l'ouverture
- * accueille un double chevron ⏪ ivoire. Version vectorielle inline de
- * build/icon.svg (même géométrie, ids préfixés pour éviter les collisions).
+ * Logo GTrace dans l'interface (barre de menus, Nouveautés) : la version
+ * dessinée pour les petites tailles, générée par scripts/gen-logo.cjs.
+ *
+ * Le SVG est inséré tel quel (net à toutes les tailles) ; ses identifiants
+ * internes (dégradés, découpe) sont préfixés par instance pour ne jamais
+ * entrer en collision quand le logo apparaît deux fois à l'écran.
  */
 export function LogoIcon({ size = 24 }: { size?: number }): JSX.Element {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const html = useMemo(
+    () =>
+      logoSmall
+        .replace(/id="([\w-]+)"/g, `id="${uid}-$1"`)
+        .replace(/url\(#([\w-]+)\)/g, `url(#${uid}-$1)`)
+        .replace('width="1024" height="1024"', `width="${size}" height="${size}"`),
+    [uid, size]
+  )
   return (
-    <svg width={size} height={size} viewBox="0 0 512 512" aria-hidden="true">
-      <defs>
-        <linearGradient id="gt-amber" x1="0" y1="0" x2="0.8" y2="1">
-          <stop offset="0" stopColor="#ffd977" />
-          <stop offset="0.5" stopColor="#f0a93e" />
-          <stop offset="1" stopColor="#d07a1e" />
-        </linearGradient>
-        <linearGradient id="gt-dark" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3a4252" />
-          <stop offset="0.55" stopColor="#232935" />
-          <stop offset="1" stopColor="#161a22" />
-        </linearGradient>
-        <linearGradient id="gt-sheen" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.14" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id="gt-ivory" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#c8cdd6" />
-        </linearGradient>
-      </defs>
-      <rect width="512" height="512" rx="118" fill="url(#gt-dark)" />
-      <rect width="512" height="266" rx="118" fill="url(#gt-sheen)" />
-      <rect
-        x="6"
-        y="6"
-        width="500"
-        height="500"
-        rx="112"
-        fill="none"
-        stroke="#ffffff"
-        strokeOpacity="0.08"
-        strokeWidth="8"
-      />
-      <path
-        d="M 256 123 A 143 143 0 1 0 399 266"
-        fill="none"
-        stroke="url(#gt-amber)"
-        strokeWidth="59"
-        strokeLinecap="round"
-      />
-      <polygon points="307,215 307,317 225,266" fill="url(#gt-ivory)" />
-      <polygon points="389,215 389,317 307,266" fill="url(#gt-ivory)" />
-    </svg>
+    <span
+      className="logo-icon"
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 }

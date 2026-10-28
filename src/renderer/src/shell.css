@@ -133,9 +133,16 @@ kbd {
   margin-right: 6px;
 }
 
-.app-logo svg {
+/* Le logo porte son propre carreau arrondi (voir scripts/logo-geometry.cjs). */
+.logo-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.logo-icon svg {
   display: block;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
 }
 
 .menubar {

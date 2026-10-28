@@ -261,10 +261,6 @@ body {
   font-weight: 600;
 }
 
-.whats-new-title svg {
-  border-radius: 5px;
-}
-
 .whats-new-version {
   color: var(--text-dim);
   font-weight: 400;

@@ -17,7 +17,7 @@
     "headless": "tsx bin/gtrace-run.ts",
     "build": "npm run typecheck && electron-vite build",
     "build:all": "npm run build:sidecar && npm run build",
-    "gen:icon": "electron scripts/gen-icon.cjs",
+    "gen:icon": "electron scripts/gen-logo.cjs",
     "dist": "npm run build && electron-builder --win",
     "dist:dir": "npm run build && electron-builder --win --dir",
     "dist:full": "npm run build:all && electron-builder --win",
