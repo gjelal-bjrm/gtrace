@@ -127,6 +127,12 @@ export interface LoopRun {
 
 export type TreeNode = { kind: 'step'; index: number } | LoopRun
 
+/** Variable écrite pendant l'exécution, avec les étapes qui la modifient. */
+export interface VariableTrack {
+  name: string
+  steps: number[]
+}
+
 export interface RunModel {
   steps: StepInfo[]
   maxMs: number
@@ -136,6 +142,8 @@ export interface RunModel {
   tree: TreeNode[]
   /** Boucles de premier niveau (accolades sous la piste) */
   topLoops: LoopRun[]
+  /** Variables écrites, par ordre alphabétique (« Suivre une variable ») */
+  variables: VariableTrack[]
 }
 
 export function buildRunModel(run: DebugRunResult, source: string): RunModel {
@@ -148,6 +156,7 @@ export function buildRunModel(run: DebugRunResult, source: string): RunModel {
 
   const rowsOf = new Map(run.resultsets.map((r) => [r.index, r.rows.length]))
   const last = new Map<string, unknown>()
+  const writers = new Map<string, number[]>()
 
   // Erreur non interceptée : sur l'instruction fautive quand l'exécution a
   // continué, en fin de journal quand elle s'est arrêtée là.
@@ -171,6 +180,9 @@ export function buildRunModel(run: DebugRunResult, source: string): RunModel {
       const hadBefore = last.has(name)
       const change = { name, before: last.get(name), hadBefore, after }
       last.set(name, after)
+      const list = writers.get(name)
+      if (list) list.push(index)
+      else writers.set(name, [index])
       return change
     })
     // L'entrée dans un CATCH porte la ligne de sa première instruction : on
@@ -210,8 +222,36 @@ export function buildRunModel(run: DebugRunResult, source: string): RunModel {
     maxMs,
     stopError,
     tree,
-    topLoops: tree.filter((n): n is LoopRun => n.kind === 'loop')
+    topLoops: tree.filter((n): n is LoopRun => n.kind === 'loop'),
+    variables: [...writers]
+      .map(([name, list]) => ({ name, steps: list }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
+}
+
+/**
+ * Valeur d'une variable à une étape : celle de sa dernière écriture jusqu'à
+ * cette étape incluse (null si elle n'a pas encore été écrite).
+ */
+export function valueAt(
+  model: RunModel,
+  track: VariableTrack,
+  stepIndex: number
+): { value: unknown; step: number } | null {
+  let lo = 0
+  let hi = track.steps.length - 1
+  let found = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (track.steps[mid] <= stepIndex) {
+      found = mid
+      lo = mid + 1
+    } else hi = mid - 1
+  }
+  if (found < 0) return null
+  const step = track.steps[found]
+  const change = model.steps[step].changes.find((c) => c.name === track.name)
+  return change ? { value: change.after, step } : null
 }
 
 /** Première ligne de l'instruction, sans l'indentation. */

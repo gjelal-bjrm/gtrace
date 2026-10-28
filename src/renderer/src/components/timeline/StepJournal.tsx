@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { ChevronLeft, ChevronRight, Flag, Repeat, TriangleAlert } from 'lucide-react'
 import { CATEGORY_LABEL, iterationOf, type LoopRun, type RunModel, type TreeNode } from '../../lib/runModel'
-import type { Bookmarks } from '../../stores/replayStore'
+import { formatSqlValue, type Bookmarks } from '../../stores/replayStore'
 
 const ROW = 26
 /** Lignes rendues au-delà de la zone visible (défilement fluide). */
@@ -23,6 +23,7 @@ export default function StepJournal({
   current,
   bookmarks,
   filtered,
+  followVar,
   matches,
   stopError,
   onSelect,
@@ -34,6 +35,8 @@ export default function StepJournal({
   bookmarks: Bookmarks
   /** Un filtre est actif : liste à plat des seules étapes retenues */
   filtered: boolean
+  /** Variable suivie : la colonne Effet montre sa valeur avant → après */
+  followVar: string | null
   matches: (index: number) => boolean
   /** L'exécution s'est arrêtée sur une erreur non interceptée */
   stopError: string | null
@@ -127,7 +130,7 @@ export default function StepJournal({
         <span>Ligne</span>
         <span>Type</span>
         <span>Instruction</span>
-        <span>Effet</span>
+        <span>{followVar ? `Valeur de ${followVar}` : 'Effet'}</span>
         <span className="dr-c-ms">Durée</span>
       </div>
       <div
@@ -178,6 +181,12 @@ export default function StepJournal({
             const s = model.steps[row.index]
             const mark = bookmarks[row.index]
             const selected = row.index === current
+            const change = followVar ? s.changes.find((c) => c.name === followVar) : undefined
+            const effect = change
+              ? change.hadBefore
+                ? `${formatSqlValue(change.before)} → ${formatSqlValue(change.after)}`
+                : `= ${formatSqlValue(change.after)}`
+              : s.effect
             return (
               <div
                 key={row.index}
@@ -205,10 +214,10 @@ export default function StepJournal({
                   <code>{s.code}</code>
                 </span>
                 <span
-                  className={`dr-c-effect${s.category === 'error' ? ' error' : ''}`}
-                  data-tip={s.effect.length > 48 ? s.effect : undefined}
+                  className={`dr-c-effect${s.category === 'error' ? ' error' : ''}${change ? ' followed' : ''}`}
+                  data-tip={effect.length > 48 ? effect : undefined}
                 >
-                  {s.effect}
+                  {effect}
                 </span>
                 <span className={`dr-c-ms${s.slow ? ' slow' : ''}`}>
                   <i

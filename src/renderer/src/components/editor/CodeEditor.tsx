@@ -169,10 +169,21 @@ function optionsFor(dec: LineDecoration): monaco.editor.IModelDecorationOptions 
   }
 }
 
+/** Ligne exécutée plusieurs fois (boucle) : nombre de passages et passage affiché. */
+export interface LinePasses {
+  line: number
+  count: number
+  /** Rang (1 = premier) du passage de l'étape courante, si elle est sur cette ligne */
+  current: number | null
+}
+
 interface Props {
   value: string
   onChange: (value: string) => void
   decorations: LineDecoration[]
+  /** « ×N » en fin de ligne ; un clic mène au passage suivant de cette ligne */
+  passes?: LinePasses[]
+  onPassClick?: (line: number) => void
   revealLine: number | null
   breakpoints: ReadonlySet<number>
   onToggleBreakpoint: (line: number) => void
@@ -190,6 +201,8 @@ export default function CodeEditor({
   value,
   onChange,
   decorations,
+  passes,
+  onPassClick,
   revealLine,
   breakpoints,
   onToggleBreakpoint,
@@ -202,6 +215,9 @@ export default function CodeEditor({
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const collectionRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null)
   const bpCollectionRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null)
+  const passCollectionRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null)
+  const onPassClickRef = useRef(onPassClick)
+  onPassClickRef.current = onPassClick
   const onChangeRef = useRef(onChange)
   const onToggleBpRef = useRef(onToggleBreakpoint)
   const onSelectionRef = useRef(onSelectionChange)
@@ -255,6 +271,7 @@ export default function CodeEditor({
     void document.fonts.ready.then(() => monaco.editor.remeasureFonts())
     collectionRef.current = editor.createDecorationsCollection()
     bpCollectionRef.current = editor.createDecorationsCollection()
+    passCollectionRef.current = editor.createDecorationsCollection()
 
     const sub = editor.onDidChangeModelContent(() => {
       internalEdit.current = true
@@ -264,6 +281,13 @@ export default function CodeEditor({
 
     // Pose/retrait de breakpoint au clic dans la gouttière
     const mouseSub = editor.onMouseDown((e) => {
+      // Clic sur « ×N » en fin de ligne : passage suivant de cette ligne.
+      const line = e.target.position?.lineNumber ?? e.target.range?.startLineNumber
+      if (e.event.target.classList.contains('dec-pass') && line) {
+        e.event.preventDefault()
+        onPassClickRef.current?.(line)
+        return
+      }
       if (
         e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN &&
         e.target.position
@@ -375,6 +399,38 @@ export default function CodeEditor({
       (hiddenRanges ?? []).map((r) => new monaco.Range(r.start, 1, r.end, 1))
     )
   }, [hiddenRanges])
+
+  // « ×N » en fin des lignes exécutées plusieurs fois (« 2/4 » sur la ligne courante).
+  useEffect(() => {
+    const model = editorRef.current?.getModel()
+    if (!model) return
+    passCollectionRef.current?.set(
+      (passes ?? [])
+        .filter((p) => p.line <= model.getLineCount())
+        .map((p) => {
+          const end = model.getLineMaxColumn(p.line)
+          return {
+            range: new monaco.Range(p.line, end, p.line, end),
+            options: {
+              // Plage vide en fin de ligne : sans cela, le texte ajouté n'est pas dessiné.
+              showIfCollapsed: true,
+              after: {
+                content: p.current !== null ? `${p.current}/${p.count}` : `×${p.count}`,
+                inlineClassName: p.current !== null ? 'dec-pass current' : 'dec-pass',
+                cursorStops: monaco.editor.InjectedTextCursorStops.None
+              },
+              hoverMessage: {
+                value:
+                  p.current !== null
+                    ? `Ligne exécutée ${p.count} fois, passage ${p.current} sur ${p.count} — cliquez pour le passage suivant`
+                    : `Ligne exécutée ${p.count} fois — cliquez pour aller au passage suivant`
+              },
+              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+            }
+          }
+        })
+    )
+  }, [passes, value])
 
   useEffect(() => {
     bpCollectionRef.current?.set(

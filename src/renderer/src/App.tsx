@@ -58,7 +58,7 @@ import type {
   StepError,
   XeLineStat
 } from '@shared/types'
-import CodeEditor, { type LineDecoration } from './components/editor/CodeEditor'
+import CodeEditor, { type LineDecoration, type LinePasses } from './components/editor/CodeEditor'
 import Timeline from './components/timeline/Timeline'
 import VariablesPanel from './components/panels/VariablesPanel'
 import MessagesPanel from './components/panels/MessagesPanel'
@@ -1581,6 +1581,37 @@ export default function App(): JSX.Element {
     setJumpLine(null)
   }, [currentStep, session?.status])
 
+  /** Lignes exécutées plusieurs fois (boucles) : étapes de chaque passage. */
+  const passesByLine = useMemo(() => {
+    const map = new Map<number, number[]>()
+    for (const s of run?.steps ?? []) {
+      // L'entrée dans un CATCH porte la ligne de l'instruction qui la suit : pas un passage.
+      if (s.startLine <= 0 || s.kind === 'catch') continue
+      const list = map.get(s.startLine)
+      if (list) list.push(s.stepIndex)
+      else map.set(s.startLine, [s.stepIndex])
+    }
+    return map
+  }, [run])
+  const linePasses = useMemo<LinePasses[]>(() => {
+    const out: LinePasses[] = []
+    for (const [line, steps] of passesByLine) {
+      if (steps.length < 2) continue
+      const k = steps.indexOf(currentStep)
+      out.push({ line, count: steps.length, current: k >= 0 ? k + 1 : null })
+    }
+    return out
+  }, [passesByLine, currentStep])
+  const goToNextPass = useCallback(
+    (line: number) => {
+      const steps = passesByLine.get(line)
+      if (!steps) return
+      const replay = useReplayStore.getState()
+      replay.select(steps.find((i) => i > replay.currentStep) ?? steps[0])
+    },
+    [passesByLine]
+  )
+
   const revealLine =
     jumpLine ??
     xe?.currentLine ??
@@ -2083,6 +2114,8 @@ export default function App(): JSX.Element {
                     value={sql}
                     onChange={onSqlChange}
                     decorations={decorations}
+                    passes={linePasses}
+                    onPassClick={goToNextPass}
                     revealLine={revealLine}
                     breakpoints={breakpoints}
                     onToggleBreakpoint={toggleBreakpoint}

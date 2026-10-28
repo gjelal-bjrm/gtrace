@@ -7,14 +7,18 @@ import {
   ChevronUp,
   Flag,
   History,
+  Pause,
+  Play,
   SkipBack,
   SkipForward,
   Timer,
-  Trash2
+  Trash2,
+  Variable,
+  X
 } from 'lucide-react'
-import { useReplayStore } from '../../stores/replayStore'
+import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
 import { useWatchStore } from '../../stores/watchStore'
-import { buildRunModel, CATEGORIES, type StepCategory } from '../../lib/runModel'
+import { buildRunModel, CATEGORIES, valueAt, type StepCategory } from '../../lib/runModel'
 import TreeMenu, { type MenuItem } from '../connections/TreeMenu'
 import StepTrack, { type ColorMode } from './StepTrack'
 import StepJournal from './StepJournal'
@@ -22,12 +26,25 @@ import StepJournal from './StepJournal'
 type StepFilter = 'all' | StepCategory | 'slow' | 'marks'
 
 const COLOR_KEY = 'gtrace.deroule.couleur'
+const SPEED_KEY = 'gtrace.deroule.vitesse'
+/** Lecture automatique : une étape toutes les 800 ms à ×1. */
+const PLAY_STEP_MS = 800
+const SPEEDS = [1, 2, 4, 8]
 
 function loadColorMode(): ColorMode {
   try {
     return localStorage.getItem(COLOR_KEY) === 'duration' ? 'duration' : 'type'
   } catch {
     return 'type'
+  }
+}
+
+function loadSpeed(): number {
+  try {
+    const v = Number(localStorage.getItem(SPEED_KEY))
+    return SPEEDS.includes(v) ? v : 1
+  } catch {
+    return 1
   }
 }
 
@@ -59,6 +76,10 @@ export default function Timeline({
     null
   )
   const [menu, setMenu] = useState<{ x: number; y: number; step: number } | null>(null)
+  /** Variable suivie : seules les étapes qui la modifient restent affichées */
+  const [followVar, setFollowVar] = useState<string | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(loadSpeed)
 
   // En session live, les étapes arrivent en rafale : le modèle suit sans bloquer l'interface.
   const run = useDeferredValue(liveRun)
@@ -73,6 +94,9 @@ export default function Timeline({
     return c
   }, [model])
   const markCount = Object.keys(bookmarks).length
+  // Variable absente de cette exécution (nouvelle exécution) : plus suivie.
+  const followed = model?.variables.find((v) => v.name === followVar) ?? null
+  const followedSteps = useMemo(() => new Set(followed?.steps ?? []), [followed])
 
   // Filtre devenu vide (nouvelle exécution, dernier signet retiré) : on revient à « Tout ».
   const activeFilter: StepFilter =
@@ -84,13 +108,15 @@ export default function Timeline({
     (i: number): boolean => {
       const s = model?.steps[i]
       if (!s) return false
+      if (followed && !followedSteps.has(i)) return false
       if (activeFilter === 'all') return true
       if (activeFilter === 'slow') return s.slow
       if (activeFilter === 'marks') return bookmarks[i] !== undefined
       return s.category === activeFilter
     },
-    [model, activeFilter, bookmarks]
+    [model, activeFilter, bookmarks, followed, followedSteps]
   )
+  const filtered = activeFilter !== 'all' || followed !== null
 
   const watchColors = useMemo(
     () =>
@@ -109,7 +135,27 @@ export default function Timeline({
     setNaming((nm) => (nm && nm.step !== currentStep ? null : nm))
   }, [currentStep])
   const sessionId = liveRun?.sessionId
-  useEffect(() => setNaming(null), [sessionId])
+  useEffect(() => {
+    setNaming(null)
+    setPlaying(false)
+  }, [sessionId])
+
+  // Lecture automatique : avance d'une étape (retenue par les filtres) à
+  // intervalle régulier, et s'arrête sur la dernière.
+  const matchesRef = useRef(matches)
+  matchesRef.current = matches
+  const stepCount = model?.steps.length ?? 0
+  useEffect(() => {
+    if (!playing) return
+    const timer = window.setInterval(() => {
+      const { currentStep: at, select: go } = useReplayStore.getState()
+      let next = at + 1
+      while (next < stepCount && !matchesRef.current(next)) next++
+      if (next >= stepCount) setPlaying(false)
+      else go(next)
+    }, PLAY_STEP_MS / speed)
+    return () => window.clearInterval(timer)
+  }, [playing, speed, stepCount])
 
   const nameInput = useRef<HTMLInputElement>(null)
   const namingStep = naming?.step
@@ -139,6 +185,37 @@ export default function Timeline({
     setBookmark(naming.step, naming.value)
     setNaming(null)
   }
+
+  const togglePlay = (): void => {
+    if (playing) {
+      setPlaying(false)
+      return
+    }
+    // Déjà sur la dernière étape retenue : on rejoue depuis le début.
+    let next = cur + 1
+    while (next < n && !matches(next)) next++
+    if (next >= n) {
+      let start = 0
+      while (start < n && !matches(start)) start++
+      if (start < n) select(start)
+    }
+    setPlaying(true)
+  }
+
+  const cycleSpeed = (): void => {
+    setSpeed((s) => {
+      const next = SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length]
+      try {
+        localStorage.setItem(SPEED_KEY, String(next))
+      } catch {
+        /* préférence non mémorisée */
+      }
+      return next
+    })
+  }
+
+  const followedValue = followed ? valueAt(model, followed, cur) : null
+  const followedColor = followed ? colorOf(followed.name) : null
 
   const changeColorMode = (mode: ColorMode): void => {
     setColorMode(mode)
@@ -186,6 +263,12 @@ export default function Timeline({
         if (e.key === 'F2' && !naming) {
           e.preventDefault()
           startNaming(cur)
+        }
+        // Espace : lecture / pause (sauf dans un champ ou sur un bouton, qui gèrent l'espace).
+        const tag = (e.target as HTMLElement).tagName
+        if (e.key === ' ' && !['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(tag)) {
+          e.preventDefault()
+          togglePlay()
         }
       }}
     >
@@ -302,6 +385,38 @@ export default function Timeline({
             <SkipForward size={14} aria-hidden="true" />
           </button>
         </span>
+        <span className="dr-player">
+          <button
+            type="button"
+            className="dr-play"
+            aria-pressed={playing}
+            onClick={togglePlay}
+            data-tip={
+              playing
+                ? 'Mettre en pause'
+                : filtered
+                  ? 'Rejouer les étapes retenues par le filtre, une à une'
+                  : "Rejouer l'exécution étape par étape : la ligne avance dans le code"
+            }
+            data-shortcut="Espace"
+          >
+            {playing ? (
+              <Pause size={13} fill="currentColor" aria-hidden="true" />
+            ) : (
+              <Play size={13} fill="currentColor" aria-hidden="true" />
+            )}
+            {playing ? 'Pause' : 'Rejouer'}
+          </button>
+          <button
+            type="button"
+            className="dr-speed"
+            onClick={cycleSpeed}
+            data-tip="Vitesse de lecture (cliquer pour changer)"
+            aria-label={`Vitesse de lecture : ×${speed}`}
+          >
+            ×{speed}
+          </button>
+        </span>
         <span className="dr-now" aria-live="polite">
           <strong className="dr-now-step">
             Étape {cur + 1} / {n}
@@ -379,6 +494,49 @@ export default function Timeline({
             <span className="dr-chip-count">{markCount}</span>
           </button>
         )}
+        {model.variables.length > 0 && (
+          <span className="dr-follow">
+            <Variable size={13} aria-hidden="true" />
+            <select
+              className="dr-select"
+              aria-label="Suivre une variable"
+              value={followed?.name ?? ''}
+              onChange={(e) => setFollowVar(e.target.value || null)}
+              data-tip="N'afficher que les étapes où cette variable change, avec sa valeur avant → après"
+            >
+              <option value="">Suivre une variable…</option>
+              {model.variables.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name} ({v.steps.length})
+                </option>
+              ))}
+            </select>
+            {followed && (
+              <>
+                <span
+                  className="dr-follow-value"
+                  style={followedColor ? { borderColor: followedColor } : undefined}
+                  data-tip={
+                    followedValue
+                      ? `Valeur à l'étape ${cur + 1} (écrite à l'étape ${followedValue.step + 1})`
+                      : `Pas encore écrite à l'étape ${cur + 1}`
+                  }
+                >
+                  {followed.name} = {followedValue ? formatSqlValue(followedValue.value) : '—'}
+                </span>
+                <button
+                  type="button"
+                  className="dr-follow-clear"
+                  onClick={() => setFollowVar(null)}
+                  aria-label="Ne plus suivre cette variable"
+                  data-tip="Ne plus suivre"
+                >
+                  <X size={13} aria-hidden="true" />
+                </button>
+              </>
+            )}
+          </span>
+        )}
         {colorMode === 'duration' && (
           <span className="dr-heat-legend" aria-label="Échelle des durées">
             rapide
@@ -397,7 +555,8 @@ export default function Timeline({
           model={model}
           current={cur}
           bookmarks={bookmarks}
-          filtered={activeFilter !== 'all'}
+          filtered={filtered}
+          followVar={followed?.name ?? null}
           matches={matches}
           stopError={model.stopError}
           onSelect={select}
