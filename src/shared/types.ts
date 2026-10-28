@@ -101,6 +101,8 @@ export interface SavedConnection {
   hasPassword: boolean
   /** Connexion marquée « production » par l'utilisateur (avertissement avant exécution) */
   production?: boolean
+  /** Couleur de la barre d'état pour cette connexion (comme SSMS), ex. « #c0392b » */
+  color?: string | null
 }
 
 export interface SaveConnectionInput {
@@ -108,6 +110,7 @@ export interface SaveConnectionInput {
   id?: string
   name: string
   production?: boolean
+  color?: string | null
   config: ConnectionConfig
 }
 

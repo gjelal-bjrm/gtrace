@@ -142,12 +142,22 @@ export default function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('run')
   /** Fin de la dernière exécution (ligne « Heure de fin » des Messages). */
   const [runFinishedAt, setRunFinishedAt] = useState<Date | null>(null)
+  /** Début de la dernière exécution (chronomètre de la barre d'état). */
+  const [runStartedAt, setRunStartedAt] = useState<Date | null>(null)
+  /** Dernière exécution arrêtée par l'utilisateur (« Requête annulée. »). */
+  const [cancelled, setCancelled] = useState(false)
+  /** Position du curseur dans l'éditeur (Ln / Col de la barre d'état). */
+  const [cursor, setCursor] = useState<{ line: number; column: number } | null>(null)
   /** Échec avant tout résultat (syntaxe, connexion…) : affiché dans Messages. */
   const [execError, setExecError] = useState<string | null>(null)
   /** Double-clic sur une erreur → sélection de la ligne dans l'éditeur. */
   const [selectLineReq, setSelectLineReq] = useState<{ line: number; seq: number } | null>(null)
   const goToLine = useCallback(
     (line: number) => setSelectLineReq((p) => ({ line, seq: (p?.seq ?? 0) + 1 })),
+    []
+  )
+  const onCursorChange = useCallback(
+    (line: number, column: number) => setCursor({ line, column }),
     []
   )
   /** Ctrl+R : volet de résultats masqué (l'éditeur prend toute la hauteur). */
@@ -435,6 +445,8 @@ export default function App(): JSX.Element {
             user: c.user,
             version: c.version,
             production: c.production,
+            // La couleur vit avec la connexion enregistrée (connections.json).
+            color: saved.find((x) => x.id === c.savedId)?.color ?? null,
             defaultDatabase: c.database
           }
         })
@@ -586,6 +598,9 @@ export default function App(): JSX.Element {
           saveHistory(event.result)
           break
         case 'stopped':
+          setRunFinishedAt(new Date())
+          setCancelled(event.reason === 'user')
+          if (event.reason === 'user') setTab('messages')
           setError(
             event.reason === 'timeout'
               ? 'Timeout de sécurité atteint : exécution annulée et transaction rollbackée.'
@@ -671,6 +686,8 @@ export default function App(): JSX.Element {
     setError(null)
     setExecError(null)
     setRunFinishedAt(null)
+    setRunStartedAt(null)
+    setCancelled(false)
     execSqlRef.current = null
   }, [setRun])
 
@@ -801,6 +818,10 @@ export default function App(): JSX.Element {
       const existing = useConnectionsStore.getState().findSame(conn)
       const target = existing ?? conn
       if (!existing) addConnection(conn)
+      // Déjà ouverte : la couleur choisie dans le dialogue s'applique quand même.
+      else if ((existing.color ?? null) !== (conn.color ?? null)) {
+        useConnectionsStore.getState().update(existing.id, { color: conn.color ?? null })
+      }
       // Lie l'onglet actif à la connexion (comme ouvrir une requête dans SSMS).
       useEditorStore.getState().patchActive({ connectionId: target.id, database: null })
       void ensureDatabases(target)
@@ -844,6 +865,7 @@ export default function App(): JSX.Element {
           user: match.user,
           version: test.serverVersion?.split('\n')[0]?.trim() ?? 'SQL Server',
           production: match.production ?? false,
+          color: match.color ?? null,
           defaultDatabase: match.database || 'master'
         })
       } catch (e) {
@@ -918,8 +940,13 @@ export default function App(): JSX.Element {
   // Ctrl+U : aller à la liste des bases (raccourci SSMS).
   const dbPickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => {
+    // Ctrl+K, Ctrl+U (décommenter) finit par Ctrl+U : juste après un Ctrl+K,
+    // la touche appartient à l'éditeur, pas à la liste des bases.
+    let ctrlKAt = 0
     const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'k') ctrlKAt = Date.now()
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'u') {
+        if (Date.now() - ctrlKAt < 2000) return
         e.preventDefault()
         e.stopPropagation()
         dbPickerRef.current?.focus()
@@ -989,6 +1016,9 @@ export default function App(): JSX.Element {
     setBusy(true)
     setError(null)
     setExecError(null)
+    setCancelled(false)
+    setRunStartedAt(new Date())
+    setRunFinishedAt(null)
     // Comme SSMS : exécuter réaffiche le volet de résultats masqué par Ctrl+R.
     setResultsHidden(false)
     try {
@@ -1121,14 +1151,34 @@ export default function App(): JSX.Element {
   // F5 / Ctrl+Entrée : exécuter (raccourcis SSMS). Ignoré si une session tourne.
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) {
+      const k = e.key.toLowerCase()
+      if (e.key === 'F5' && e.ctrlKey) {
+        // Ctrl+F5 : Analyser (vérifier la syntaxe sans exécuter), comme SSMS.
         e.preventDefault()
+        e.stopPropagation()
+        if (!busy && !locked) void analyze()
+      } else if (
+        (e.key === 'F5' && !e.shiftKey && !e.altKey) ||
+        (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'Enter' || k === 'e'))
+      ) {
+        // F5 / Ctrl+E (SSMS) / Ctrl+Entrée : exécuter.
+        e.preventDefault()
+        e.stopPropagation()
         if (!busy && !locked) void execute()
+      } else if (e.key === 'Pause' || e.key === 'Cancel') {
+        // Alt+Pause (SSMS) : arrêter la session de débogage ou le profilage.
+        e.preventDefault()
+        if (session) void window.gtrace.debugStop(session.id)
+        else if (xe) void window.gtrace.xeStop(xe.id)
+      } else if (e.key === 'F8' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        // F8 (SSMS) : afficher / masquer l'explorateur d'objets.
+        e.preventDefault()
+        setShowExplorer((v) => !v)
       }
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [execute, busy, locked])
+  }, [execute, analyze, busy, locked, session, xe])
 
   /** Rejouer une session passée sans réexécuter (historique) : onglet virtuel + replay. */
   const onLoadHistory = useCallback(
@@ -1226,8 +1276,8 @@ export default function App(): JSX.Element {
   }, [run])
 
   const messages = useMemo(
-    () => buildMessages(run, runFinishedAt, execError),
-    [run, runFinishedAt, execError]
+    () => buildMessages(run, runFinishedAt, execError, cancelled),
+    [run, runFinishedAt, execError, cancelled]
   )
   const messageErrors = messages.filter((m) => m.kind === 'error').length
 
@@ -1603,6 +1653,7 @@ export default function App(): JSX.Element {
                 <TabBar
                   locked={locked}
                   onSwitch={switchToTab}
+                  runningTabId={busy || session ? activeId : null}
                   onClose={doCloseTab}
                   onNew={doNew}
                   onOpen={() => void doOpen()}
@@ -1639,6 +1690,7 @@ export default function App(): JSX.Element {
                     hiddenRanges={hiddenRanges}
                     onSelectionChange={onEditorSelection}
                     selectLine={selectLineReq}
+                    onCursorChange={onCursorChange}
                   />
                 </div>
               </section>
@@ -1759,10 +1811,14 @@ export default function App(): JSX.Element {
         connection={activeConn}
         database={activeRef?.database ?? activeConn?.defaultDatabase ?? null}
         run={run}
-        busy={busy}
-        sessionStatus={session?.status ?? null}
+        running={busy || session?.status === 'running'}
+        paused={session?.status === 'paused' ? (session.paused?.startLine ?? 0) : null}
         failed={execError !== null}
+        cancelled={cancelled}
+        startedAt={runStartedAt}
+        finishedAt={runFinishedAt}
         selectionLines={selectionLines}
+        cursor={cursor}
       />
     </div>
   )

@@ -128,6 +128,8 @@ interface Props {
   onSelectionChange?: (sel: { text: string; startLine: number; startColumn: number } | null) => void
   /** Demande de sélection d'une ligne entière (double-clic sur une erreur) ; seq la rend rejouable. */
   selectLine?: { line: number; seq: number } | null
+  /** Position du curseur (Ln / Col de la barre d'état) */
+  onCursorChange?: (line: number, column: number) => void
 }
 
 export default function CodeEditor({
@@ -139,7 +141,8 @@ export default function CodeEditor({
   onToggleBreakpoint,
   hiddenRanges,
   onSelectionChange,
-  selectLine
+  selectLine,
+  onCursorChange
 }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -148,6 +151,8 @@ export default function CodeEditor({
   const onChangeRef = useRef(onChange)
   const onToggleBpRef = useRef(onToggleBreakpoint)
   const onSelectionRef = useRef(onSelectionChange)
+  const onCursorRef = useRef(onCursorChange)
+  onCursorRef.current = onCursorChange
   const internalEdit = useRef(false)
   onChangeRef.current = onChange
   onToggleBpRef.current = onToggleBreakpoint
@@ -208,6 +213,22 @@ export default function CodeEditor({
       }
     })
 
+    // Raccourcis SSMS : Ctrl+K, Ctrl+C commente les lignes, Ctrl+K, Ctrl+U les décommente.
+    editor.addCommand(
+      monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC),
+      () => editor.trigger('ssms', 'editor.action.addCommentLine', null)
+    )
+    editor.addCommand(
+      monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyU),
+      () => editor.trigger('ssms', 'editor.action.removeCommentLine', null)
+    )
+    // Tests automatisés en développement uniquement (jamais dans l'application installée).
+    if (import.meta.env.DEV) (window as unknown as { __gtraceEditor?: unknown }).__gtraceEditor = editor
+
+    const cursorSub = editor.onDidChangeCursorPosition((e) =>
+      onCursorRef.current?.(e.position.lineNumber, e.position.column)
+    )
+
     // Suivi de la sélection (pour « exécuter la sélection sinon tout »).
     const selSub = editor.onDidChangeCursorSelection((e) => {
       const model = editor.getModel()
@@ -224,6 +245,7 @@ export default function CodeEditor({
       sub.dispose()
       mouseSub.dispose()
       selSub.dispose()
+      cursorSub.dispose()
       editor.dispose()
       editorRef.current = null
     }

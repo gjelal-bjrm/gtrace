@@ -194,7 +194,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                 <td>Exécuter</td>
                 <td>
                   <span className="help-key">F5</span> ou{' '}
-                  <span className="help-key">Ctrl+Entrée</span>
+                  <span className="help-key">Ctrl+E</span>
                 </td>
                 <td>Step suivant / précédent</td>
                 <td>
@@ -222,6 +222,37 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                 <td>Fermer l&apos;onglet</td>
                 <td>
                   <span className="help-key">Ctrl+W</span>
+                </td>
+              </tr>
+              <tr>
+                <td>Analyser</td>
+                <td>
+                  <span className="help-key">Ctrl+F5</span>
+                </td>
+                <td>Arrêter le débogage</td>
+                <td>
+                  <span className="help-key">Alt+Pause</span>
+                </td>
+              </tr>
+              <tr>
+                <td>Masquer les résultats</td>
+                <td>
+                  <span className="help-key">Ctrl+R</span>
+                </td>
+                <td>Liste des bases</td>
+                <td>
+                  <span className="help-key">Ctrl+U</span>
+                </td>
+              </tr>
+              <tr>
+                <td>Commenter / décommenter</td>
+                <td>
+                  <span className="help-key">Ctrl+K, Ctrl+C</span> /{' '}
+                  <span className="help-key">Ctrl+K, Ctrl+U</span>
+                </td>
+                <td>Explorateur d&apos;objets</td>
+                <td>
+                  <span className="help-key">F8</span>
                 </td>
               </tr>
             </tbody>

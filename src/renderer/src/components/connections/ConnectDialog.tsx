@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionConfig, ConnectionRef, SavedConnection } from '@shared/types'
 import { useConnectionsStore, type OpenConnection } from '../../stores/connectionsStore'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { CONNECTION_COLORS } from '../../lib/connectionColors'
 
 interface Props {
   onConnected: (connection: OpenConnection) => void
@@ -19,6 +20,8 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
   const [password, setPassword] = useState('')
   const [rememberName, setRememberName] = useState('')
   const [rememberProd, setRememberProd] = useState(false)
+  /** Couleur de la barre d'état (null = celle du thème) */
+  const [color, setColor] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,6 +43,7 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
     setDatabase(selectedSaved.database)
     setUser(selectedSaved.user)
     setPassword('')
+    setColor(selectedSaved.color ?? null)
   }, [selectedSaved])
 
   const connect = useCallback(async () => {
@@ -61,6 +65,23 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
             : { id: selectedSaved.id }
         label = selectedSaved.name
         production = selectedSaved.production === true
+        // Couleur modifiée : on la mémorise avec la connexion (mot de passe
+        // vide = conservé côté main).
+        if ((selectedSaved.color ?? null) !== color) {
+          await window.gtrace.saveConnection({
+            id: selectedSaved.id,
+            name: selectedSaved.name,
+            production: selectedSaved.production,
+            color,
+            config: {
+              server: selectedSaved.server,
+              port: selectedSaved.port,
+              database: selectedSaved.database,
+              user: selectedSaved.user,
+              password: ''
+            }
+          })
+        }
       } else {
         const config: ConnectionConfig = {
           server: server.trim(),
@@ -74,7 +95,8 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
           const entry = await window.gtrace.saveConnection({
             name: rememberName.trim(),
             config,
-            production: rememberProd
+            production: rememberProd,
+            color
           })
           ref = { id: entry.id }
           label = entry.name
@@ -99,6 +121,7 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
         user: user.trim(),
         version: test.serverVersion?.split('\n')[0]?.trim() ?? 'SQL Server',
         production,
+        color,
         defaultDatabase: database.trim() || 'master'
       })
       onClose()
@@ -107,7 +130,7 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
     } finally {
       setBusy(false)
     }
-  }, [selectedSaved, password, server, port, database, user, rememberName, rememberProd, onConnected, onClose])
+  }, [selectedSaved, password, server, port, database, user, rememberName, rememberProd, color, onConnected, onClose])
 
   const deleteSaved = useCallback(
     async (id: string, name: string) => {
@@ -214,6 +237,31 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
                 if (e.key === 'Enter') void connect()
               }}
             />
+
+            <label>Couleur</label>
+            <div
+              className="color-swatches"
+              title="Couleur de la barre d'état pour cette connexion — pour repérer la production d'un coup d'œil"
+            >
+              <button
+                type="button"
+                className={`color-swatch none${color === null ? ' active' : ''}`}
+                onClick={() => setColor(null)}
+                title="Couleur du thème (rouge si « prod »)"
+              >
+                ✕
+              </button>
+              {CONNECTION_COLORS.map((c) => (
+                <button
+                  type="button"
+                  key={c.value}
+                  className={`color-swatch${color === c.value ? ' active' : ''}`}
+                  style={{ background: c.value }}
+                  onClick={() => setColor(c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
 
             {!selectedSaved && (
               <>

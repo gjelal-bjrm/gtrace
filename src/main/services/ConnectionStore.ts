@@ -14,6 +14,7 @@ interface StoredConnection {
   /** base64 du mot de passe chiffré par safeStorage (DPAPI sous Windows) */
   passwordEnc: string | null
   production?: boolean
+  color?: string | null
 }
 
 /**
@@ -45,7 +46,8 @@ export class ConnectionStore {
       database: c.database,
       user: c.user,
       hasPassword: c.passwordEnc !== null,
-      production: c.production
+      production: c.production,
+      color: c.color ?? null
     }))
   }
 
@@ -77,7 +79,8 @@ export class ConnectionStore {
       passwordEnc: input.config.password
         ? safeStorage.encryptString(input.config.password).toString('base64')
         : (existing?.passwordEnc ?? null),
-      production: input.production
+      production: input.production,
+      color: input.color ?? null
     }
     if (existing) {
       this.items[this.items.indexOf(existing)] = stored

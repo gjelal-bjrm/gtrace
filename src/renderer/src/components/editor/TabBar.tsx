@@ -8,6 +8,8 @@ interface Props {
   /** Session de debug ou profilage live : on gèle l'ouverture/fermeture/bascule d'onglets. */
   locked: boolean
   onSwitch: (id: string) => void
+  /** Onglet dont l'exécution tourne (« Exécution… » après son nom, comme SSMS) */
+  runningTabId: string | null
   onClose: (id: string) => void
   onNew: () => void
   onOpen: () => void
@@ -18,6 +20,7 @@ interface Props {
 export default function TabBar({
   locked,
   onSwitch,
+  runningTabId,
   onClose,
   onNew,
   onOpen,
@@ -82,6 +85,7 @@ ${t.filePath}` : label.full}
               <span className="tab-name">{t.title}</span>
               <span className={`tab-target${t.connectionId ? '' : ' off'}`}> - {label.target}</span>
               {t.dirty ? '*' : ''}
+              {t.id === runningTabId && <span className="tab-running"> Exécution…</span>}
             </span>
             <button
               className="tab-close"

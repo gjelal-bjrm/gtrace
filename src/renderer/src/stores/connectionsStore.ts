@@ -18,6 +18,8 @@ export interface OpenConnection {
   /** Première ligne de @@VERSION, ex. « Microsoft SQL Server 2022 … » */
   version: string
   production: boolean
+  /** Couleur de la barre d'état (null = couleur du thème, rouge si production) */
+  color?: string | null
   /** Base par défaut de la connexion (Initial Catalog) */
   defaultDatabase: string
 }
@@ -50,6 +52,8 @@ interface ConnectionsState {
   connections: OpenConnection[]
   add: (conn: OpenConnection) => void
   remove: (id: string) => void
+  /** Met à jour une connexion ouverte (ex. couleur changée dans le dialogue). */
+  update: (id: string, patch: Partial<OpenConnection>) => void
   get: (id: string | null) => OpenConnection | null
   /** Connexion ouverte visant la même cible, ou null. */
   findSame: (conn: OpenConnection) => OpenConnection | null
@@ -61,6 +65,8 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
   connections: [],
   add: (conn) => set((s) => ({ connections: [...s.connections, conn] })),
   remove: (id) => set((s) => ({ connections: s.connections.filter((c) => c.id !== id) })),
+  update: (id, patch) =>
+    set((s) => ({ connections: s.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
   get: (id) => (id ? (get().connections.find((c) => c.id === id) ?? null) : null),
   findSame: (conn) => get().connections.find((c) => sameTarget(c, conn)) ?? null,
   // Restauration de l'espace de travail : on écarte les doublons éventuels

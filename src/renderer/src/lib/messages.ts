@@ -36,7 +36,8 @@ function finishedLabel(at: Date): string {
 export function buildMessages(
   run: DebugRunResult | null,
   finishedAt: Date | null,
-  execError: string | null
+  execError: string | null,
+  cancelled = false
 ): RunMessage[] {
   const out: RunMessage[] = []
   if (run) {
@@ -60,6 +61,7 @@ export function buildMessages(
   }
   // Échec avant toute exécution (syntaxe, connexion…) : pas de run, seulement l'erreur.
   if (execError) out.push({ kind: 'error', text: execError })
-  if (finishedAt && (run || execError)) out.push({ kind: 'info', text: finishedLabel(finishedAt) })
+  if (cancelled) out.push({ kind: 'error', text: "Requête annulée par l'utilisateur." })
+  if (finishedAt && (run || execError || cancelled)) out.push({ kind: 'info', text: finishedLabel(finishedAt) })
   return out
 }
