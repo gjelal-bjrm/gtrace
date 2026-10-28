@@ -7,6 +7,7 @@ import type {
   DbObjects
 } from '@shared/types'
 import { useConnectionsStore, type OpenConnection } from '../../stores/connectionsStore'
+import { useExplorerStore } from '../../stores/explorerStore'
 
 /** Un script à ouvrir dans un nouvel onglet, lié à une connexion + base. */
 export interface OpenScript {
@@ -61,6 +62,14 @@ export default function ObjectExplorer({
   const [objects, setObjects] = useState<Record<string, DbObjects | 'loading'>>({})
   const [columns, setColumns] = useState<Record<string, ColumnInfo[] | 'loading'>>({})
   const [error, setError] = useState<string | null>(null)
+  const selectedKey = useExplorerStore((s) => s.selection?.key ?? null)
+  const select = useExplorerStore((s) => s.select)
+
+  /** Props d'une ligne sélectionnable : le clic la sélectionne (base héritée par Ctrl+N). */
+  const rowSel = (key: string, connectionId: string, database: string | null) => ({
+    'data-selected': key === selectedKey || undefined,
+    onClick: () => select({ key, connectionId, database })
+  })
 
   // Purge des caches d'arbre pour les connexions fermées (évite une fuite
   // mémoire d'état sur les cycles connexion/déconnexion).
@@ -195,7 +204,13 @@ export default function ObjectExplorer({
     if (cols === 'loading') return [<div key={`${key}-l`} className="tree-loading" style={indent(5)}>chargement…</div>]
     if (!Array.isArray(cols)) return []
     return cols.map((c) => (
-      <div key={`${key}-${c.name}`} className="tree-row tree-leaf" style={indent(5)} title={c.dataType}>
+      <div
+        key={`${key}-${c.name}`}
+        className="tree-row tree-leaf"
+        style={indent(5)}
+        title={c.dataType}
+        {...rowSel(`${key}/${c.name}`, conn.id, db)}
+      >
         <span className="tree-icon">{c.isPrimaryKey ? '🔑' : '▪'}</span>
         <span className="tree-label">{c.name}</span>
         <span className="tree-meta">
@@ -217,7 +232,7 @@ export default function ObjectExplorer({
     const label = `${o.schema}.${o.name}`
     return (
       <div key={key}>
-        <div className="tree-row" style={indent(4)}>
+        <div className="tree-row" style={indent(4)} {...rowSel(key, conn.id, db)}>
           {hasColumns ? (
             <button
               className="tree-twisty"
@@ -268,7 +283,7 @@ export default function ObjectExplorer({
     const list = objs && objs !== 'loading' ? objs[kind] : []
     return (
       <div key={folderKey}>
-        <div className="tree-row" style={indent(3)}>
+        <div className="tree-row" style={indent(3)} {...rowSel(folderKey, conn.id, db)}>
           <button className="tree-twisty" onClick={() => toggle(folderKey)}>
             {isOpen(folderKey) ? '▾' : '▸'}
           </button>
@@ -287,7 +302,7 @@ export default function ObjectExplorer({
     const dbKey = `${conn.id}/${db.name}`
     return (
       <div key={dbKey}>
-        <div className="tree-row" style={indent(2)}>
+        <div className="tree-row" style={indent(2)} {...rowSel(dbKey, conn.id, db.name)}>
           <button
             className="tree-twisty"
             disabled={!db.online}
@@ -320,7 +335,7 @@ export default function ObjectExplorer({
     const sysKey = `${conn.id}/__system__`
     return (
       <div key={conn.id} className="tree-server">
-        <div className="tree-row tree-root" style={indent(0)}>
+        <div className="tree-row tree-root" style={indent(0)} {...rowSel(conn.id, conn.id, null)}>
           <button className="tree-twisty" onClick={() => toggle(conn.id, () => void loadDatabases(conn))}>
             {isOpen(conn.id) ? '▾' : '▸'}
           </button>

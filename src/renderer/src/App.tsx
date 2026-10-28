@@ -28,7 +28,8 @@ import AiActivityPanel from './components/panels/AiActivityPanel'
 import DiagnosisModal from './components/panels/DiagnosisModal'
 import TabBar from './components/editor/TabBar'
 import Breadcrumb from './components/editor/Breadcrumb'
-import { breadcrumbFor, deadRanges, executedStatements } from './lib/executionPath'
+import { breadcrumbFor, deadRanges, executedStatements, lastExecutedUse } from './lib/executionPath'
+import { tabLabel } from './lib/tabLabel'
 import { mapArgsToParams, parseProcCall } from './lib/procCall'
 import { isolateProcedureBatch } from './lib/sqlBatches'
 import Splitter from './components/layout/Splitter'
@@ -52,6 +53,7 @@ function loadSize(key: string, def: number, min: number, max: number): number {
 }
 import { useEditorStore } from './stores/editorStore'
 import { useConnectionsStore, type OpenConnection } from './stores/connectionsStore'
+import { useExplorerStore } from './stores/explorerStore'
 import type { EditorTab } from './stores/editorStore'
 import type { WorkspaceState } from '@shared/types'
 
@@ -656,6 +658,9 @@ export default function App(): JSX.Element {
 
   const onSqlChange = useCallback(
     (value: string) => {
+      // Changer d'onglet recharge l'éditeur avec le texte de l'onglet : ce
+      // n'est pas une frappe, l'onglet ne doit pas passer « modifié ».
+      if (value === useEditorStore.getState().active().content) return
       useEditorStore.getState().editContent(value)
       resetDerived()
     },
@@ -672,30 +677,48 @@ export default function App(): JSX.Element {
     [locked, resetDerived]
   )
 
+  /**
+   * Contexte hérité par une nouvelle requête, comme SSMS : l'élément
+   * sélectionné dans l'explorateur s'il a le focus, sinon la connexion et la
+   * base courante de l'onglet actif.
+   */
+  const inheritedTarget = useCallback((): { connectionId: string; database: string | null } | null => {
+    const { selection, focusArea } = useExplorerStore.getState()
+    if (focusArea === 'explorer' && selection && useConnectionsStore.getState().get(selection.connectionId)) {
+      return { connectionId: selection.connectionId, database: selection.database }
+    }
+    if (activeConn) return { connectionId: activeConn.id, database: tabDatabase }
+    return null
+  }, [activeConn, tabDatabase])
+
   const doNew = useCallback(() => {
     if (locked) return
-    // Un nouvel onglet hérite de la connexion active (pratique, comme SSMS).
+    const target = inheritedTarget()
     const st = useEditorStore.getState()
     st.newTab()
-    if (activeConn) st.patchActive({ connectionId: activeConn.id })
+    if (target) st.patchActive(target)
     resetDerived()
-  }, [locked, activeConn, resetDerived])
+  }, [locked, inheritedTarget, resetDerived])
 
   const doOpen = useCallback(async () => {
     if (locked) return
     try {
       const files = await window.gtrace.openFiles()
       if (files.length === 0) return
+      // Comme SSMS, un fichier .sql ne mémorise pas sa connexion : il s'ouvre
+      // sur le serveur et la base de l'onglet actif au moment de l'ouverture.
+      const target = activeConn ? { connectionId: activeConn.id, database: tabDatabase } : null
       const st = useEditorStore.getState()
       for (const f of files) {
+        const alreadyOpen = st.tabs.some((t) => t.filePath === f.path)
         st.openFile(f.path, f.name, f.content)
-        if (activeConn) st.patchActive({ connectionId: activeConn.id })
+        if (target && !alreadyOpen) st.patchActive(target)
       }
       resetDerived()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [locked, activeConn, resetDerived])
+  }, [locked, activeConn, tabDatabase, resetDerived])
 
   const doSave = useCallback(async (saveAs = false) => {
     const st = useEditorStore.getState()
@@ -816,6 +839,7 @@ export default function App(): JSX.Element {
       if (locked) return
       removeConnection(connectionId)
       useEditorStore.getState().detachConnection(connectionId)
+      useExplorerStore.getState().forget(connectionId)
       setDbCache((prev) => {
         const next = { ...prev }
         delete next[connectionId]
@@ -836,10 +860,49 @@ export default function App(): JSX.Element {
   const pickDatabase = useCallback(
     (database: string) => {
       if (locked) return
-      useEditorStore.getState().patchActive({ database: database || null })
+      const def = useConnectionsStore.getState().get(useEditorStore.getState().active().connectionId)
+      const db = database || null
+      // La base par défaut reste « null » : l'onglet suit alors la connexion.
+      useEditorStore.getState().patchActive({ database: db && db === def?.defaultDatabase ? null : db })
     },
     [locked]
   )
+
+  // Zone qui a le focus (explorateur ou éditeur) : décide de ce dont hérite Ctrl+N.
+  useEffect(() => {
+    const track = (e: Event): void => {
+      const el = e.target as Element | null
+      if (!el?.closest) return
+      if (el.closest('.object-explorer')) useExplorerStore.getState().setFocusArea('explorer')
+      else if (el.closest('.editor-body')) useExplorerStore.getState().setFocusArea('editor')
+    }
+    window.addEventListener('mousedown', track, true)
+    window.addEventListener('focusin', track, true)
+    return () => {
+      window.removeEventListener('mousedown', track, true)
+      window.removeEventListener('focusin', track, true)
+    }
+  }, [])
+
+  // Ctrl+U : aller à la liste des bases (raccourci SSMS).
+  const dbPickerRef = useRef<HTMLSelectElement>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'u') {
+        e.preventDefault()
+        e.stopPropagation()
+        dbPickerRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // Titre de la fenêtre = nom complet de l'onglet actif, comme SSMS.
+  const activeLabel = tabLabel(activeTab, activeConn)
+  useEffect(() => {
+    document.title = `${activeLabel.full}${activeTab.dirty ? '*' : ''} - GTrace`
+  }, [activeLabel.full, activeTab.dirty])
 
   const analyzeText = useCallback(
     async (text: string) => {
@@ -1099,6 +1162,25 @@ export default function App(): JSX.Element {
     }
   }, [activeRef, activeConn, activeTab.connectionId, tabDatabase, compatLevel, resetDerived])
 
+  // Un « USE MaBase » exécuté change la base de l'onglet, comme dans SSMS :
+  // la liste des bases et les exécutions suivantes suivent.
+  useEffect(() => {
+    // run.instrument et non l'état `instr` : celui-ci peut arriver un rendu
+    // plus tard (deux stores distincts) et serait encore vide au premier run.
+    if (!run || !activeConn) return
+    const db = lastExecutedUse(execSqlRef.current ?? sqlRef.current, run.instrument.statements, run)
+    if (!db) return
+    const known = dbCacheRef.current[activeConn.id]?.find(
+      (d) => d.name.toLowerCase() === db.toLowerCase()
+    )
+    const name = known?.name ?? db
+    const next = name === activeConn.defaultDatabase ? null : name
+    if (next !== useEditorStore.getState().active().database) {
+      useEditorStore.getState().patchActive({ database: next })
+    }
+    // Volontairement limité au changement de run : changer d'onglet le remet à null.
+  }, [run])
+
   const decorations = useMemo<LineDecoration[]>(() => {
     const decs: LineDecoration[] = []
     if (instr) {
@@ -1292,17 +1374,23 @@ export default function App(): JSX.Element {
           {/* Pas de bouton « Connecter » ici : il vit dans l'en-tête de
               l'explorateur d'objets, à un seul endroit. */}
           <select
+            ref={dbPickerRef}
             className="db-picker"
-            value={tabDatabase ?? ''}
+            value={activeConn ? (tabDatabase ?? activeConn.defaultDatabase) : ''}
             disabled={!activeConn || locked}
             onChange={(e) => pickDatabase(e.target.value)}
-            title="Base d'exécution de l'onglet actif"
+            title="Bases de données disponibles (Ctrl+U)"
           >
-            <option value="">
-              {activeConn ? `${activeConn.defaultDatabase} (défaut)` : '—'}
-            </option>
+            {!activeConn && <option value="">—</option>}
+            {/* La base courante figure toujours, même avant le chargement de la liste. */}
+            {activeConn &&
+              !activeDatabases?.some((d) => d.name === (tabDatabase ?? activeConn.defaultDatabase)) && (
+                <option value={tabDatabase ?? activeConn.defaultDatabase}>
+                  {tabDatabase ?? activeConn.defaultDatabase}
+                </option>
+              )}
             {activeDatabases
-              ?.filter((d) => d.online && d.name !== activeConn?.defaultDatabase)
+              ?.filter((d) => d.online)
               .map((d) => (
                 <option key={d.name} value={d.name}>
                   {d.name}

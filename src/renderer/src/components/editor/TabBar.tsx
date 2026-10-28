@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
+import { useConnectionsStore } from '../../stores/connectionsStore'
+import { tabLabel } from '../../lib/tabLabel'
 import { IconNewFile, IconOpenFolder, IconSave } from './icons'
 
 interface Props {
@@ -23,6 +26,15 @@ export default function TabBar({
 }: Props): JSX.Element {
   const tabs = useEditorStore((s) => s.tabs)
   const activeId = useEditorStore((s) => s.activeId)
+  const connections = useConnectionsStore((s) => s.connections)
+  const tabsRef = useRef<HTMLDivElement>(null)
+
+  // L'onglet actif reste visible (un nouvel onglet s'ajoute à droite, souvent hors champ).
+  useEffect(() => {
+    tabsRef.current
+      ?.querySelector('.editor-tab.active')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeId, tabs.length])
 
   return (
     <div className="tabbar">
@@ -55,19 +67,22 @@ export default function TabBar({
           <span className="sa-plus">+</span>
         </button>
       </div>
-      <div className="tabbar-tabs">
-        {tabs.map((t) => (
+      <div className="tabbar-tabs" ref={tabsRef}>
+        {tabs.map((t) => {
+          const label = tabLabel(t, connections.find((c) => c.id === t.connectionId) ?? null)
+          return (
           <div
             key={t.id}
             className={`editor-tab${t.id === activeId ? ' active' : ''}`}
             onClick={() => onSwitch(t.id)}
-            title={t.filePath ?? t.title}
+            title={t.filePath ? `${label.full}
+${t.filePath}` : label.full}
           >
             <span className="tab-title">
-              {t.dirty ? '● ' : ''}
-              {t.title}
+              <span className="tab-name">{t.title}</span>
+              <span className={`tab-target${t.connectionId ? '' : ' off'}`}> - {label.target}</span>
+              {t.dirty ? '*' : ''}
             </span>
-            {t.database && <span className="tab-db">{t.database}</span>}
             <button
               className="tab-close"
               onClick={(e) => {
@@ -80,7 +95,8 @@ export default function TabBar({
               ×
             </button>
           </div>
-        ))}
+          )
+        })}
       </div>
       {locked && <span className="tabbar-lock">session active — onglets gelés</span>}
     </div>

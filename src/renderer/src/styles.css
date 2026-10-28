@@ -729,6 +729,12 @@ button:disabled {
   background: var(--bg-hover);
 }
 
+/* Élément sélectionné : c'est lui dont Ctrl+N reprend le serveur et la base. */
+.tree-row[data-selected] {
+  background: var(--accent-dim);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .tree-root {
   font-weight: 600;
 }
@@ -1006,7 +1012,7 @@ button:disabled {
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  max-width: 240px;
+  max-width: 360px;
 }
 
 .editor-tab:hover {
@@ -1020,17 +1026,24 @@ button:disabled {
 }
 
 .editor-tab .tab-title {
+  display: flex;
+  min-width: 0;
+}
+
+/* Le nom du fichier se raccourcit en premier : « serveur.base » reste lisible. */
+.editor-tab .tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.tab-db {
+.tab-target {
+  flex-shrink: 0;
   color: var(--text-dim);
-  font-size: 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-family: var(--mono);
+  white-space: pre;
+}
+
+.tab-target.off {
+  font-style: italic;
 }
 
 .tab-close {

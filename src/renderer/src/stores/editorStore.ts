@@ -156,6 +156,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   restore: (tabs, activeId) => {
     if (tabs.length === 0) return
     const active = activeId && tabs.some((t) => t.id === activeId) ? activeId : tabs[0].id
+    // La numérotation continue après les onglets restaurés (jamais deux
+    // « sans titre 2 »), comme SQLQuery1, SQLQuery2… dans SSMS.
+    for (const t of tabs) {
+      const n = /^sans titre (\d+)$/.exec(t.title)
+      if (n) untitledCounter = Math.max(untitledCounter, Number(n[1]))
+    }
     set({ tabs, activeId: active })
   }
 }))

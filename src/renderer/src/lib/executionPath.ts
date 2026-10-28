@@ -110,3 +110,25 @@ export function shortLabel(type: string): string {
   }
   return table[t] ?? t.toUpperCase()
 }
+
+/**
+ * Base visée par le dernier `USE` réellement exécuté, ou null s'il n'y en a pas.
+ * Sert à faire suivre la base de l'onglet, comme SSMS après un `USE MaBase`.
+ */
+export function lastExecutedUse(
+  sql: string,
+  statements: InstrumentedStatement[],
+  run: DebugRunResult
+): string | null {
+  const useStatements = new Map(
+    statements.filter((s) => s.type === 'UseStatement').map((s) => [s.index, s])
+  )
+  if (useStatements.size === 0) return null
+  let last: InstrumentedStatement | null = null
+  for (const step of run.steps) last = useStatements.get(step.statementIndex) ?? last
+  if (!last) return null
+  const text = sql.split(/\r?\n/).slice(last.startLine - 1, last.endLine).join('\n')
+  const m = /\bUSE\s+(?:\[((?:[^\]]|\]\])+)\]|"([^"]+)"|([\w@#$]+))/i.exec(text)
+  if (!m) return null
+  return m[1] !== undefined ? m[1].replace(/\]\]/g, ']') : (m[2] ?? m[3])
+}
