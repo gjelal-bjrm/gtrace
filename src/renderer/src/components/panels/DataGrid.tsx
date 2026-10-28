@@ -9,7 +9,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  *   marque la ligne comme sélectionnée ; re-cliquer fait défiler les couleurs
  *   puis revient à l'état d'origine.
  * - Clic sur la case « # » (en-tête) : (dé)sélectionne toutes les lignes.
- * - Copie (Ctrl+C ou clic droit → Copier) : lignes sélectionnées, sinon tout.
+ * - Clic sur un en-tête de colonne : sélectionne la colonne (comme SSMS).
+ * - Copie : Ctrl+C sans en-têtes, Ctrl+Maj+C avec (raccourcis SSMS) ; la
+ *   colonne sélectionnée, sinon les lignes sélectionnées, sinon tout. NULL est
+ *   copié en toutes lettres, comme SSMS.
  * - Clic droit : menu (copier avec/sans en-têtes, colorer, exporter CSV/JSON/Excel).
  */
 
@@ -110,6 +113,8 @@ export default function DataGrid({
   const shown = rows.slice(0, maxRows)
   const [rowColor, setRowColor] = useState<Map<number, number>>(() => new Map())
   const [menu, setMenu] = useState<Menu | null>(null)
+  /** Colonne sélectionnée par un clic sur son en-tête (null = aucune). */
+  const [selectedCol, setSelectedCol] = useState<number | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   /** Indices ciblés par copie/export : lignes colorées, sinon toutes les lignes. */
@@ -160,14 +165,15 @@ export default function DataGrid({
 
   const doCopy = useCallback(
     async (withHeaders: boolean) => {
-      const idx = targetIndices()
+      const idx = selectedCol !== null ? shown.map((_, i) => i) : targetIndices()
+      const pick = (row: unknown[]): unknown[] => (selectedCol !== null ? [row[selectedCol]] : row)
       const lines: string[] = []
-      if (withHeaders) lines.push(columns.join('\t'))
-      for (const i of idx) lines.push(shown[i].map(cellRaw).join('\t'))
+      if (withHeaders) lines.push(pick(columns).join('\t'))
+      for (const i of idx) lines.push(pick(shown[i]).map(cellText).join('\t'))
       await copyText(lines.join('\r\n'))
       setMenu(null)
     },
-    [columns, shown, targetIndices]
+    [columns, shown, targetIndices, selectedCol]
   )
 
   const doExport = useCallback(
@@ -213,7 +219,7 @@ export default function DataGrid({
         const sel = window.getSelection()
         if (sel && !sel.isCollapsed) return // laisser copier le texte sélectionné
         e.preventDefault()
-        void doCopy(true)
+        void doCopy(e.shiftKey)
       }
     }
     el.addEventListener('keydown', onKey)
@@ -243,12 +249,23 @@ export default function DataGrid({
               <th
                 className="grid-rownum clickable"
                 title="Tout sélectionner / désélectionner"
-                onClick={toggleAll}
+                onClick={() => {
+                  setSelectedCol(null)
+                  toggleAll()
+                }}
               >
                 #
               </th>
               {columns.map((c, i) => (
-                <th key={i} title={c}>
+                <th
+                  key={i}
+                  title={`${c} — cliquer pour sélectionner la colonne`}
+                  className={`clickable${selectedCol === i ? ' col-selected' : ''}`}
+                  onClick={() => {
+                    setRowColor(new Map())
+                    setSelectedCol((cur) => (cur === i ? null : i))
+                  }}
+                >
                   {c || `(col ${i + 1})`}
                 </th>
               ))}
@@ -263,14 +280,22 @@ export default function DataGrid({
                   <td
                     className="grid-rownum clickable"
                     title="Colorer / sélectionner la ligne (re-cliquer pour changer / réinitialiser)"
-                    onClick={() => cycleRow(ri)}
+                    onClick={() => {
+                      setSelectedCol(null)
+                      cycleRow(ri)
+                    }}
                   >
                     {ri + 1}
                   </td>
                   {row.map((cell, ci) => {
                     const t = cellText(cell)
                     return (
-                      <td key={ci} className={cellClass(cell)} title={t} style={{ background: bg }}>
+                      <td
+                        key={ci}
+                        className={`${cellClass(cell)}${selectedCol === ci ? ' col-selected' : ''}`}
+                        title={t}
+                        style={{ background: bg }}
+                      >
                         {t}
                       </td>
                     )
@@ -292,10 +317,10 @@ export default function DataGrid({
           <div className="ctx-backdrop" onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null) }} />
           <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
             <button className="ctx-item" onClick={() => void doCopy(false)}>
-              Copier
+              Copier <span className="ctx-key">Ctrl+C</span>
             </button>
             <button className="ctx-item" onClick={() => void doCopy(true)}>
-              Copier avec en-têtes
+              Copier avec en-têtes <span className="ctx-key">Ctrl+Maj+C</span>
             </button>
             <div className="ctx-sep" />
             <div className="ctx-label">Couleur de ligne</div>

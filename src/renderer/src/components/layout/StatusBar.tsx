@@ -14,6 +14,7 @@ export default function StatusBar({
   run,
   busy,
   sessionStatus,
+  failed,
   selectionLines
 }: {
   connection: OpenConnection | null
@@ -21,6 +22,8 @@ export default function StatusBar({
   run: DebugRunResult | null
   busy: boolean
   sessionStatus: string | null
+  /** Échec avant tout résultat (syntaxe, connexion…) */
+  failed: boolean
   selectionLines: number
 }): JSX.Element {
   const rows = run ? run.resultsets.reduce((n, rs) => n + rs.rows.length, 0) : null
@@ -35,7 +38,7 @@ export default function StatusBar({
   } else if (sessionStatus === 'paused') {
     state = 'En pause'
     stateClass = 'busy'
-  } else if (run && run.errors.length > 0) {
+  } else if (failed || (run && run.errors.length > 0)) {
     state = 'Erreur'
     stateClass = 'err'
   }

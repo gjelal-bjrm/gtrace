@@ -126,6 +126,8 @@ interface Props {
   hiddenRanges?: { start: number; end: number }[]
   /** Sélection courante (null si vide) : ligne/colonne 1-based du début + texte. */
   onSelectionChange?: (sel: { text: string; startLine: number; startColumn: number } | null) => void
+  /** Demande de sélection d'une ligne entière (double-clic sur une erreur) ; seq la rend rejouable. */
+  selectLine?: { line: number; seq: number } | null
 }
 
 export default function CodeEditor({
@@ -136,7 +138,8 @@ export default function CodeEditor({
   breakpoints,
   onToggleBreakpoint,
   hiddenRanges,
-  onSelectionChange
+  onSelectionChange,
+  selectLine
 }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -275,6 +278,17 @@ export default function CodeEditor({
       editorRef.current.revealLineInCenterIfOutsideViewport(revealLine)
     }
   }, [revealLine])
+
+  // Comme SSMS : la ligne fautive est sélectionnée en entier et l'éditeur reprend le focus.
+  useEffect(() => {
+    const editor = editorRef.current
+    const model = editor?.getModel()
+    if (!editor || !model || !selectLine) return
+    const line = Math.min(Math.max(1, selectLine.line), model.getLineCount())
+    editor.setSelection(new monaco.Range(line, 1, line, model.getLineMaxColumn(line)))
+    editor.revealLineInCenterIfOutsideViewport(line)
+    editor.focus()
+  }, [selectLine])
 
   return <div ref={hostRef} className="editor-host" />
 }

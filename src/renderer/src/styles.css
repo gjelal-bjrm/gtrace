@@ -1096,6 +1096,12 @@ button:disabled {
 }
 
 /* Résultats agrandis : occupent toute la colonne (l'éditeur est masqué). */
+/* Ctrl+R : volet masqué, l'éditeur prend toute la hauteur (display:flex
+   l'emporterait sinon sur l'attribut hidden). */
+.results-pane[hidden] {
+  display: none;
+}
+
 .results-pane.maximized {
   flex: 1 1 auto;
   height: auto !important;
@@ -2307,4 +2313,65 @@ th {
 
 .peek-text {
   white-space: pre;
+}
+
+/* ─── Lot 2 : Messages et grille façon SSMS ─────────────────────────────── */
+
+/* NULL en toutes lettres sur fond jaune pâle, pour le distinguer d'un texte vide. */
+.data-grid tbody tr td.cell-null:not(.col-selected) {
+  background: color-mix(in srgb, #f2d64b 16%, transparent);
+}
+
+/* Colonne sélectionnée par un clic sur son en-tête. */
+.data-grid tbody tr > td.col-selected:not(.grid-rownum),
+.data-grid thead tr > th.col-selected:not(.grid-rownum) {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--text);
+}
+
+.data-grid thead tr > th.col-selected:not(.grid-rownum) {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.data-grid thead th.clickable {
+  cursor: pointer;
+}
+
+.ctx-key {
+  float: right;
+  margin-left: 18px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.tab-count.error,
+.tabs button.active .tab-count.error {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.messages {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 4px;
+  user-select: text;
+}
+
+.message {
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: pre-wrap;
+  cursor: default;
+}
+
+.message.error {
+  color: var(--error);
+}
+
+.message.has-line {
+  cursor: pointer;
+}
+
+.message.selected {
+  background: var(--accent-dim);
 }

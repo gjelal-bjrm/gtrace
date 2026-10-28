@@ -15,6 +15,7 @@ import type {
 import CodeEditor, { type LineDecoration } from './components/editor/CodeEditor'
 import Timeline from './components/timeline/Timeline'
 import VariablesPanel from './components/panels/VariablesPanel'
+import MessagesPanel from './components/panels/MessagesPanel'
 import ResultsPanel from './components/panels/ResultsPanel'
 import RunPanel from './components/panels/RunPanel'
 import InspectPanel from './components/panels/InspectPanel'
@@ -30,6 +31,7 @@ import TabBar from './components/editor/TabBar'
 import Breadcrumb from './components/editor/Breadcrumb'
 import { breadcrumbFor, deadRanges, executedStatements, lastExecutedUse } from './lib/executionPath'
 import { tabLabel } from './lib/tabLabel'
+import { buildMessages } from './lib/messages'
 import { mapArgsToParams, parseProcCall } from './lib/procCall'
 import { isolateProcedureBatch } from './lib/sqlBatches'
 import Splitter from './components/layout/Splitter'
@@ -76,7 +78,7 @@ interface XeResult {
   errors: StepError[]
 }
 
-type Tab = 'run' | 'variables' | 'results' | 'data' | 'inspect' | 'profile'
+type Tab = 'run' | 'variables' | 'results' | 'messages' | 'data' | 'inspect' | 'profile'
 
 export default function App(): JSX.Element {
   // ─── Onglets d'édition (chaque onglet = un document lié à une connexion) ───
@@ -138,6 +140,18 @@ export default function App(): JSX.Element {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState<Tab>('run')
+  /** Fin de la dernière exécution (ligne « Heure de fin » des Messages). */
+  const [runFinishedAt, setRunFinishedAt] = useState<Date | null>(null)
+  /** Échec avant tout résultat (syntaxe, connexion…) : affiché dans Messages. */
+  const [execError, setExecError] = useState<string | null>(null)
+  /** Double-clic sur une erreur → sélection de la ligne dans l'éditeur. */
+  const [selectLineReq, setSelectLineReq] = useState<{ line: number; seq: number } | null>(null)
+  const goToLine = useCallback(
+    (line: number) => setSelectLineReq((p) => ({ line, seq: (p?.seq ?? 0) + 1 })),
+    []
+  )
+  /** Ctrl+R : volet de résultats masqué (l'éditeur prend toute la hauteur). */
+  const [resultsHidden, setResultsHidden] = useState(false)
   const [showExplorer, setShowExplorer] = useState(true)
   const [showConnect, setShowConnect] = useState(false)
   /** Résultats agrandis : masque l'éditeur pour donner toute la place aux données. */
@@ -566,6 +580,8 @@ export default function App(): JSX.Element {
           break
         case 'done':
           store.endLive(event.result)
+          setRunFinishedAt(new Date())
+          if (event.result.errors.length > 0) setTab('messages')
           setSession(null)
           saveHistory(event.result)
           break
@@ -653,6 +669,8 @@ export default function App(): JSX.Element {
     setRun(null)
     setXeResult(null)
     setError(null)
+    setExecError(null)
+    setRunFinishedAt(null)
     execSqlRef.current = null
   }, [setRun])
 
@@ -884,6 +902,19 @@ export default function App(): JSX.Element {
     }
   }, [])
 
+  // Ctrl+R : masquer / réafficher le volet de résultats (raccourci SSMS).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        e.stopPropagation()
+        setResultsHidden((h) => !h)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
   // Ctrl+U : aller à la liste des bases (raccourci SSMS).
   const dbPickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => {
@@ -957,6 +988,9 @@ export default function App(): JSX.Element {
     }
     setBusy(true)
     setError(null)
+    setExecError(null)
+    // Comme SSMS : exécuter réaffiche le volet de résultats masqué par Ctrl+R.
+    setResultsHidden(false)
     try {
       if (breakpoints.size === 0) {
         const outcome = await window.gtrace.debugRun({
@@ -970,18 +1004,25 @@ export default function App(): JSX.Element {
         })
         setInstr(outcome.instrument)
         setRun(outcome)
-        // Choix de l'onglet le plus utile : un simple SELECT (resultsets, aucune
-        // variable écrite) montre directement les Résultats ; une proc avec des
-        // variables montre les Variables ; sinon la vue Exécution.
+        setRunFinishedAt(new Date())
+        // Onglet le plus utile, comme SSMS : une erreur montre les Messages ;
+        // un simple SELECT, les Résultats ; une proc qui écrit des variables,
+        // les Variables ; une instruction sans résultat (UPDATE…), les Messages.
         const wroteVars = outcome.steps.some((s) => Object.keys(s.variables).length > 0)
+        const singleCall =
+          outcome.steps.length === 1 &&
+          outcome.instrument.statements.find((st) => st.index === outcome.steps[0].statementIndex)
+            ?.type === 'ExecuteStatement'
         setTab(
-          outcome.resultsets.length > 0 && !wroteVars
-            ? 'results'
-            : outcome.steps.length > 0
-              ? 'variables'
-              : outcome.resultsets.length > 0
-                ? 'results'
-                : 'run'
+          outcome.errors.length > 0
+            ? 'messages'
+            : outcome.resultsets.length > 0 && !wroteVars
+              ? 'results'
+              : wroteVars || singleCall
+                ? 'variables'
+                : outcome.resultsets.length > 0
+                  ? 'results'
+                  : 'messages'
         )
         saveHistory(outcome)
         return
@@ -1029,8 +1070,11 @@ export default function App(): JSX.Element {
         }
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // L'échec s'affiche dans Messages, là où SSMS le montre.
       setRun(null)
+      setExecError(e instanceof Error ? e.message : String(e))
+      setRunFinishedAt(new Date())
+      setTab('messages')
     } finally {
       setBusy(false)
     }
@@ -1180,6 +1224,12 @@ export default function App(): JSX.Element {
     }
     // Volontairement limité au changement de run : changer d'onglet le remet à null.
   }, [run])
+
+  const messages = useMemo(
+    () => buildMessages(run, runFinishedAt, execError),
+    [run, runFinishedAt, execError]
+  )
+  const messageErrors = messages.filter((m) => m.kind === 'error').length
 
   const decorations = useMemo<LineDecoration[]>(() => {
     const decs: LineDecoration[] = []
@@ -1588,15 +1638,19 @@ export default function App(): JSX.Element {
                     onToggleBreakpoint={toggleBreakpoint}
                     hiddenRanges={hiddenRanges}
                     onSelectionChange={onEditorSelection}
+                    selectLine={selectLineReq}
                   />
                 </div>
               </section>
 
-              <Splitter axis="y" onDrag={(d) => setResultsHeight((h) => clamp(h - d, 140, 900))} />
+              {!resultsHidden && (
+                <Splitter axis="y" onDrag={(d) => setResultsHeight((h) => clamp(h - d, 140, 900))} />
+              )}
             </>
           )}
 
           <section
+            hidden={resultsHidden && !focusMode}
             className={`results-pane${focusMode ? ' maximized' : ''}`}
             style={focusMode ? undefined : { height: resultsHeight }}
           >
@@ -1606,17 +1660,25 @@ export default function App(): JSX.Element {
               <CodePeek sql={sql} line={revealLine} />
             )}
           <nav className="tabs">
-            <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')} title="Paramètres de la procédure, options et export — le point de départ avant de lancer">
-              Exécution
-            </button>
-            <button className={tab === 'variables' ? 'active' : ''} onClick={() => setTab('variables')} title="Valeur de toutes les variables au step sélectionné (rempli automatiquement par l’exécution)">
-              Variables
-            </button>
             <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')} title="Les jeux de données renvoyés par vos SELECT">
               Résultats
               {run && run.resultsets.length > 0 && (
                 <span className="tab-count">{run.resultsets.length}</span>
               )}
+            </button>
+            <button
+              className={tab === 'messages' ? 'active' : ''}
+              onClick={() => setTab('messages')}
+              title="Messages du serveur : lignes affectées, erreurs (double-clic → ligne fautive), heure de fin"
+            >
+              Messages
+              {messageErrors > 0 && <span className="tab-count error">{messageErrors}</span>}
+            </button>
+            <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')} title="Paramètres de la procédure, options et export — le point de départ avant de lancer">
+              Exécution
+            </button>
+            <button className={tab === 'variables' ? 'active' : ''} onClick={() => setTab('variables')} title="Valeur de toutes les variables au step sélectionné (rempli automatiquement par l’exécution)">
+              Variables
             </button>
             <button className={tab === 'data' ? 'active' : ''} onClick={() => setTab('data')} title="Contenu des tables suivies après chaque écriture, avec le différentiel — même sans SELECT et malgré un ROLLBACK">
               Données
@@ -1662,6 +1724,7 @@ export default function App(): JSX.Element {
               <VariablesPanel onOpenProcedure={() => void openCalledProcedure()} />
             )}
             {tab === 'results' && <ResultsPanel />}
+            {tab === 'messages' && <MessagesPanel messages={messages} onGoToLine={goToLine} />}
             {tab === 'data' && <SnapshotsPanel />}
             {tab === 'inspect' && (
               <InspectPanel
@@ -1698,6 +1761,7 @@ export default function App(): JSX.Element {
         run={run}
         busy={busy}
         sessionStatus={session?.status ?? null}
+        failed={execError !== null}
         selectionLines={selectionLines}
       />
     </div>
