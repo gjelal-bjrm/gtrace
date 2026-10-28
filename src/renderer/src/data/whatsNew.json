@@ -1,5 +1,23 @@
 [
   {
+    "version": "0.1.9",
+    "notes": [
+      "Déroulé : comparer deux moments",
+      "Déroulé : suivre une variable, passages dans le code, lecture automatique",
+      "Nouveau logo : G en points crème sur fond anthracite mat",
+      "Déroulé de l'exécution (remplace la chronologie) : piste lisible, journal et signets",
+      "Thème Sauge et sable par défaut, style en cartes, polices Inter et JetBrains Mono",
+      "Coque façon SSMS : disposition, barres d'outils, panneaux et thèmes",
+      "Barre de menus et onglets façon SSMS",
+      "Explorateur d'objets au clic droit, façon SSMS",
+      "Barre d'état et raccourcis d'exécution façon SSMS",
+      "Volet Résultats / Messages façon SSMS",
+      "Chaque onglet sait où il est connecté (modèle SSMS)",
+      "CLI --connection <id|nom> : GRay ouvre GTrace sur la connexion du projet",
+      "Le repli du code non exécuté ne peut plus piéger l'utilisateur"
+    ]
+  },
+  {
     "version": "0.1.8",
     "notes": [
       "Débogue un script de déploiement complet (DROP / GO / CREATE / GRANT)",
