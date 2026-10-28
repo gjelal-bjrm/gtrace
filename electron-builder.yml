@@ -31,6 +31,10 @@ files:
   - '!scripts/*'
   - '!bin/*'
   - '!docs/*'
+  # Vidéo et captures de présentation (≈ 80 Mo) : rien à faire dans l'installeur.
+  - '!marketing/**'
+  - '!*.tsbuildinfo'
+  - '!.mcp.json'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!**/{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!**/{.eslintrc*,eslint.config*,.prettier*,.editorconfig,.gitignore,.gitattributes}'

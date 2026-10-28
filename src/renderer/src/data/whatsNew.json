@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.1.10",
+    "notes": [
+      "Beaucoup plus rapide : les grands résultats ne figent plus la fenêtre, colorer une ligne et écrire dans l'éditeur sont instantanés",
+      "Grille de résultats : toutes les lignes sont consultables (plus de limite à 500)",
+      "Déroulé de l'exécution : ouvert, réduit à une ligne ou masqué (boutons en haut à droite, menu Affichage)",
+      "Historique plus léger : 1000 lignes gardées par résultat"
+    ]
+  },
+  {
     "version": "0.1.9",
     "notes": [
       "Déroulé : comparer deux moments",
