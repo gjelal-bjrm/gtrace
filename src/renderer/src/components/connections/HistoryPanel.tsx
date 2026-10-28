@@ -1,5 +1,7 @@
 import { useEffect, useState, type JSX } from 'react'
+import { History, TriangleAlert, X } from 'lucide-react'
 import type { HistoryEntry, HistoryEntrySummary } from '@shared/types'
+import DockPanel from '../layout/DockPanel'
 
 interface Props {
   onLoadHistory: (entry: HistoryEntry) => void
@@ -31,33 +33,35 @@ export default function HistoryPanel({ onLoadHistory, version, locked }: Props):
     })
 
   return (
-    <div className="history-panel">
-      <button
-        className="section-header"
-        onClick={toggle}
-        title="Chaque exécution est enregistrée avec sa trace : on peut la rouvrir et la rejouer sans relancer la requête sur le serveur."
-      >
-        <span className="tree-twisty">{open ? '▾' : '▸'}</span> 🕘 Exécutions passées
-        {history.length > 0 && <span className="history-count">{history.length}</span>}
-      </button>
-      {open && (
-        <ul className="history-list">
-          {history.length === 0 ? (
-            <li className="hint history-empty">
-              Rien pour l&apos;instant. Chaque exécution viendra s&apos;ajouter ici et pourra être
-              rouverte telle quelle, sans relancer la requête.
-            </li>
-          ) : (
-            history.map((h) => (
-              <li key={h.id}>
-                <button
-                  className="history-item"
-                  disabled={locked}
-                  onClick={() => void window.gtrace.historyLoad(h.id).then(onLoadHistory)}
-                  title={`Rouvrir cette exécution (sans la relancer)\n${h.server} / ${h.database}\n${new Date(h.savedAt).toLocaleString()}`}
-                >
+    <DockPanel
+      title="Exécutions passées"
+      className="history-panel"
+      collapsible
+      open={open}
+      onToggle={toggle}
+      badge={history.length > 0 ? <span className="dock-badge">{history.length}</span> : undefined}
+    >
+      <ul className="history-list">
+        {history.length === 0 ? (
+          <li className="hint history-empty">
+            Rien pour l&apos;instant. Chaque exécution viendra s&apos;ajouter ici et pourra être
+            rouverte telle quelle, sans relancer la requête.
+          </li>
+        ) : (
+          history.map((h) => (
+            <li key={h.id}>
+              <button
+                className="history-item"
+                disabled={locked}
+                onClick={() => void window.gtrace.historyLoad(h.id).then(onLoadHistory)}
+                data-tip={`Rouvrir cette exécution, sans la relancer — ${h.server} / ${h.database}`}
+              >
+                <History size={14} className="history-icon" aria-hidden="true" />
+                <span className="history-text">
                   <span className="history-title">
-                    {h.errorCount > 0 ? '⚠ ' : ''}
+                    {h.errorCount > 0 && (
+                      <TriangleAlert size={12} className="history-warn" aria-label="Avec erreurs" />
+                    )}
                     {h.title}
                   </span>
                   <span className="history-meta">
@@ -69,25 +73,26 @@ export default function HistoryPanel({ onLoadHistory, version, locked }: Props):
                       minute: '2-digit'
                     })}
                   </span>
-                </button>
-                <button
-                  className="btn btn-icon"
-                  title="Supprimer cette exécution enregistrée"
-                  disabled={locked}
-                  onClick={() =>
-                    void window.gtrace
-                      .historyDelete(h.id)
-                      .then(() => window.gtrace.historyList())
-                      .then(setHistory)
-                  }
-                >
-                  ✕
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      )}
-    </div>
+                </span>
+              </button>
+              <button
+                className="history-delete"
+                data-tip="Supprimer cette exécution enregistrée"
+                aria-label="Supprimer cette exécution enregistrée"
+                disabled={locked}
+                onClick={() =>
+                  void window.gtrace
+                    .historyDelete(h.id)
+                    .then(() => window.gtrace.historyList())
+                    .then(setHistory)
+                }
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
+    </DockPanel>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, type JSX } from 'react'
+import { X } from 'lucide-react'
 import { useUpdateStore } from '../../stores/updateStore'
 
 /**
@@ -73,8 +74,8 @@ export default function UpdateBanner(): JSX.Element | null {
     <div className={`update-banner ${tone}`}>
       <span className="update-banner-text">{text}</span>
       {action}
-      <button className="btn btn-icon" onClick={dismiss} title="Masquer">
-        ✕
+      <button className="modal-close" onClick={dismiss} aria-label="Masquer" data-tip="Masquer">
+        <X size={15} aria-hidden="true" />
       </button>
     </div>
   )

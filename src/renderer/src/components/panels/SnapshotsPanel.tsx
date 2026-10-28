@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import type { TableSnapshot } from '@shared/types'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
+import { Camera } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 interface DiffedSnapshot {
   snapshot: TableSnapshot
@@ -58,11 +60,11 @@ export default function SnapshotsPanel(): JSX.Element {
 
   if (!run) {
     return (
-      <p className="hint">
-        Renseignez des tables à snapshotter (onglet Exécution) puis ▶ : leur contenu est
-        capturé après chaque écriture — y compris <span className="vars">#temp</span> et
+      <EmptyState icon={Camera} title="Aucune donnée suivie">
+        Indiquez des tables à suivre dans l&apos;onglet Paramètres puis exécutez : leur contenu
+        est capturé après chaque écriture — y compris <span className="vars">#temp</span> et
         variables tables, et même à travers un ROLLBACK.
-      </p>
+      </EmptyState>
     )
   }
   if (byTable.size === 0) {

@@ -3,6 +3,8 @@ import type { ConnectionConfig, ConnectionRef, SavedConnection } from '@shared/t
 import { useConnectionsStore, type OpenConnection } from '../../stores/connectionsStore'
 import { useEscapeClose } from '../../lib/useEscapeClose'
 import { CONNECTION_COLORS } from '../../lib/connectionColors'
+import { Plus, Server, Trash2 } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 interface Props {
   onConnected: (connection: OpenConnection) => void
@@ -150,12 +152,7 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
   return (
     <div className="modal-overlay">
       <div className="modal connect-dialog">
-        <div className="modal-header">
-          <span>🖥 Se connecter au serveur</span>
-          <button className="btn btn-icon" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+        <ModalHeader icon={Server} title="Se connecter au serveur" onClose={onClose} />
 
         <div className="modal-body">
           {error && <div className="error-box">{error}</div>}
@@ -168,7 +165,9 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
                 onClick={() => setSavedId('')}
               >
                 <span className="saved-row-main">
-                  <span className="saved-row-name">＋ Nouvelle connexion</span>
+                  <span className="saved-row-name">
+                    <Plus size={14} aria-hidden="true" /> Nouvelle connexion
+                  </span>
                 </span>
               </button>
               {saved.map((c) => (
@@ -179,8 +178,9 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
                 >
                   <span className="saved-row-main">
                     <span className="saved-row-name">
-                      {c.production ? '⚠ ' : ''}
+                      <Server size={14} aria-hidden="true" />
                       {c.name}
+                      {c.production && <span className="prod-pill">PROD</span>}
                     </span>
                     <span className="saved-row-meta">
                       {c.server}
@@ -190,13 +190,14 @@ export default function ConnectDialog({ onConnected, onClose }: Props): JSX.Elem
                   <button
                     type="button"
                     className="btn btn-icon saved-row-del"
-                    title="Supprimer cette connexion enregistrée"
+                    data-tip="Supprimer cette connexion enregistrée"
+                    aria-label="Supprimer cette connexion enregistrée"
                     onClick={(e) => {
                       e.stopPropagation()
                       void deleteSaved(c.id, c.name)
                     }}
                   >
-                    🗑
+                    <Trash2 size={14} aria-hidden="true" />
                   </button>
                 </div>
               ))}

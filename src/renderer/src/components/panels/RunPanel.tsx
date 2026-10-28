@@ -1,5 +1,7 @@
 import type { InstrumentResult } from '@shared/types'
 import { formatSqlValue, useReplayStore } from '../../stores/replayStore'
+import { Download, SlidersHorizontal, Stethoscope, TriangleAlert } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 interface Props {
   instr: InstrumentResult | null
@@ -34,10 +36,10 @@ export default function RunPanel({
 
   if (!instr) {
     return (
-      <p className="hint">
-        « Analyser » parse et instrumente le source ; « ▶ Exécuter » lance le replay. Les
-        paramètres de la procédure apparaîtront ici.
-      </p>
+      <EmptyState icon={SlidersHorizontal} title="Paramètres de la procédure">
+        Ouvrez une procédure (clic droit › Déboguer dans l&apos;explorateur) ou cliquez sur
+        Analyser (Ctrl+F5) : ses paramètres apparaîtront ici, à remplir avant d&apos;exécuter.
+      </EmptyState>
     )
   }
 
@@ -155,14 +157,14 @@ export default function RunPanel({
           <h3>
             Session
             <button className="link-btn" onClick={() => onExport('md')}>
-              ⬇ Markdown
+              <Download size={13} aria-hidden="true" /> Markdown
             </button>
             <button className="link-btn" onClick={() => onExport('json')}>
-              ⬇ JSON
+              <Download size={13} aria-hidden="true" /> JSON
             </button>
             {hasFailure && (
               <button className="link-btn danger" onClick={onDiagnose}>
-                🩺 Diagnostiquer
+                <Stethoscope size={13} aria-hidden="true" /> Diagnostiquer
               </button>
             )}
           </h3>
@@ -187,7 +189,9 @@ export default function RunPanel({
 
       {untraced.length > 0 && (
         <>
-          <h3>⚠ Statements non tracés ({untraced.length})</h3>
+          <h3>
+            <TriangleAlert size={13} aria-hidden="true" /> Instructions non tracées ({untraced.length})
+          </h3>
           <table>
             <tbody>
               {untraced.map((s) => (

@@ -11,7 +11,11 @@ export interface ThemeDef {
   label: string
   tagline: string
   base: 'dark' | 'light'
-  /** Variables CSS surchargées (clés sans « -- »). */
+  /**
+   * Variables CSS surchargées (clés sans « -- »). Outre les couleurs de base,
+   * chaque thème décrit sa « coque » à la manière de SSMS : barres (chrome),
+   * bandeau des onglets (band), onglet actif, barre de requête et barre d'état.
+   */
   vars: Record<string, string>
 }
 
@@ -43,7 +47,20 @@ export const THEMES: ThemeDef[] = [
       'heat-0': '#c9d3de',
       'heat-1': '#f0c674',
       'heat-2': '#e8973a',
-      'heat-3': '#c42b1c'
+      'heat-3': '#c42b1c',
+      chrome: '#e9edf4',
+      'chrome-border': '#cfd6e3',
+      band: '#2b3a56',
+      'band-fg': '#d3dbe8',
+      'band-hover': 'rgba(255, 255, 255, 0.1)',
+      'tab-active': '#f6d36b',
+      'tab-active-fg': '#1f2329',
+      querybar: '#efe4a6',
+      'querybar-fg': '#3b3416',
+      statusbar: '#0e5ea8',
+      'statusbar-fg': '#ffffff',
+      'accent-fg': '#ffffff',
+      surface: '#ffffff'
     }
   },
   {
@@ -73,7 +90,20 @@ export const THEMES: ThemeDef[] = [
       'heat-0': '#3a3f4a',
       'heat-1': '#8a6d2f',
       'heat-2': '#c99a3a',
-      'heat-3': '#d96c6c'
+      'heat-3': '#d96c6c',
+      chrome: '#1f2229',
+      'chrome-border': '#2b2f37',
+      band: '#121419',
+      'band-fg': '#9aa0aa',
+      'band-hover': 'rgba(255, 255, 255, 0.06)',
+      'tab-active': '#d9a441',
+      'tab-active-fg': '#16181d',
+      querybar: '#3a321d',
+      'querybar-fg': '#ecd9a5',
+      statusbar: '#c4912f',
+      'statusbar-fg': '#17140c',
+      'accent-fg': '#16181d',
+      surface: '#14161a'
     }
   },
   {
@@ -103,7 +133,20 @@ export const THEMES: ThemeDef[] = [
       'heat-0': '#3a3f4a',
       'heat-1': '#9d7d2f',
       'heat-2': '#d19a3a',
-      'heat-3': '#f14c4c'
+      'heat-3': '#f14c4c',
+      chrome: '#2b2b2c',
+      'chrome-border': '#3a3a3a',
+      band: '#1f1f20',
+      'band-fg': '#a8a8a8',
+      'band-hover': 'rgba(255, 255, 255, 0.06)',
+      'tab-active': '#3794ff',
+      'tab-active-fg': '#ffffff',
+      querybar: '#36342a',
+      'querybar-fg': '#e3d9a6',
+      statusbar: '#007acc',
+      'statusbar-fg': '#ffffff',
+      'accent-fg': '#ffffff',
+      surface: '#1e1e1e'
     }
   },
   {
@@ -133,7 +176,20 @@ export const THEMES: ThemeDef[] = [
       'heat-0': '#3f3f46',
       'heat-1': '#9d7d2f',
       'heat-2': '#d19a3a',
-      'heat-3': '#f45b5b'
+      'heat-3': '#f45b5b',
+      chrome: '#2d2d30',
+      'chrome-border': '#3f3f46',
+      band: '#1b1b1c',
+      'band-fg': '#a8a8b0',
+      'band-hover': 'rgba(255, 255, 255, 0.07)',
+      'tab-active': '#007acc',
+      'tab-active-fg': '#ffffff',
+      querybar: '#3b3826',
+      'querybar-fg': '#e6dba5',
+      statusbar: '#007acc',
+      'statusbar-fg': '#ffffff',
+      'accent-fg': '#ffffff',
+      surface: '#1e1e1e'
     }
   },
   {
@@ -163,7 +219,21 @@ export const THEMES: ThemeDef[] = [
       'heat-0': '#4a4a4a',
       'heat-1': '#b09000',
       'heat-2': '#ffd400',
-      'heat-3': '#ff5b5b'
+      'heat-3': '#ff5b5b',
+      chrome: '#000000',
+      'chrome-border': '#5a5a5a',
+      band: '#000000',
+      'band-fg': '#ffffff',
+      'band-hover': 'rgba(255, 255, 0, 0.14)',
+      'tab-active': '#ffd400',
+      'tab-active-fg': '#000000',
+      querybar: '#1a1700',
+      'querybar-fg': '#ffd400',
+      statusbar: '#ffd400',
+      'statusbar-fg': '#000000',
+      'accent-fg': '#000000',
+      'run-fg': '#000000',
+      surface: '#000000'
     }
   }
 ]

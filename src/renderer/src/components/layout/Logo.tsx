@@ -53,14 +53,3 @@ export function LogoIcon({ size = 24 }: { size?: number }): JSX.Element {
     </svg>
   )
 }
-
-/** Lockup « M2 » : l'icône fait office de « G », suivie de « Trace » + légende. */
-export function Wordmark(): JSX.Element {
-  return (
-    <span className="wordmark">
-      <LogoIcon size={26} />
-      <span className="wordmark-name">Trace</span>
-      <span className="wordmark-tagline">TIME-TRAVEL T-SQL</span>
-    </span>
-  )
-}

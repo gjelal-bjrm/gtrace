@@ -1,6 +1,8 @@
 import type { JSX } from 'react'
 import { formatSqlValue, useReplayStore, variablesAt } from '../../stores/replayStore'
 import { useWatchStore } from '../../stores/watchStore'
+import { FolderOpen, Variable } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 export default function VariablesPanel({
   onOpenProcedure
@@ -14,8 +16,21 @@ export default function VariablesPanel({
   const cycle = useWatchStore((s) => s.cycle)
   useWatchStore((s) => s.marked) // re-rendu au changement de marquage
 
-  if (!run) return <p className="hint">Exécuter d&apos;abord (▶) pour inspecter les variables.</p>
-  if (run.steps.length === 0) return <p className="hint">Aucun step capturé.</p>
+  if (!run) {
+    return (
+      <EmptyState icon={Variable} title="Aucune variable à afficher">
+        Exécutez un script ou une procédure : la valeur de chaque variable, étape par étape,
+        s&apos;affichera ici et suivra la chronologie.
+      </EmptyState>
+    )
+  }
+  if (run.steps.length === 0) {
+    return (
+      <EmptyState icon={Variable} title="Aucune instruction exécutée pour l'instant">
+        Les variables apparaîtront ici au fil de l&apos;exécution.
+      </EmptyState>
+    )
+  }
 
   const variables = variablesAt(run, currentStep)
   const step = run.steps[currentStep]
@@ -49,7 +64,7 @@ export default function VariablesPanel({
         {onOpenProcedure && (
           <div className="proc-call-action">
             <button className="btn btn-primary" onClick={onOpenProcedure}>
-              📂 Ouvrir la procédure et suivre ses variables
+              <FolderOpen size={14} aria-hidden="true" /> Ouvrir la procédure et suivre ses variables
             </button>
             <span className="hint">
               GTrace va chercher son code en base, l&apos;ouvre dans un onglet et reprend

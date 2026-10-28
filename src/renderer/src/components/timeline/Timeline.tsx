@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight, History, SkipBack, SkipForward } from 'lucide-react'
 import { useReplayStore } from '../../stores/replayStore'
 import { useWatchStore } from '../../stores/watchStore'
 
@@ -31,18 +32,23 @@ export default function Timeline(): JSX.Element | null {
   return (
     <footer className="timeline-bar">
       <div className="transport">
-        <button onClick={first} title="Premier step (Ctrl+←)">
-          ⏮
-        </button>
-        <button onClick={prev} title="Step précédent (Shift+F10)">
-          ◀
-        </button>
-        <button onClick={next} title="Step suivant (F10)">
-          ▶
-        </button>
-        <button onClick={last} title="Dernier step (Ctrl+→)">
-          ⏭
-        </button>
+        <span className="timeline-title">
+          <History size={14} aria-hidden="true" /> Chronologie
+        </span>
+        <span className="transport-buttons">
+          <button type="button" onClick={first} data-tip="Première étape" data-shortcut="Ctrl+←" aria-label="Première étape">
+            <SkipBack size={14} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={prev} data-tip="Étape précédente" data-shortcut="Maj+F10" aria-label="Étape précédente">
+            <ChevronLeft size={15} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={next} data-tip="Étape suivante" data-shortcut="F10" aria-label="Étape suivante">
+            <ChevronRight size={15} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={last} data-tip="Dernière étape" data-shortcut="Ctrl+→" aria-label="Dernière étape">
+            <SkipForward size={14} aria-hidden="true" />
+          </button>
+        </span>
         <span className="step-label">
           étape {currentStep + 1}/{run.steps.length} — ligne {current.startLine} — {currentType}
           {current.durationMs !== null ? ` — ${current.durationMs} ms` : ''}

@@ -1,14 +1,24 @@
 import { useEffect, useState, type JSX } from 'react'
+import {
+  CircleCheck,
+  CirclePause,
+  CircleX,
+  LoaderCircle,
+  Plug,
+  TriangleAlert,
+  Unplug,
+  type LucideIcon
+} from 'lucide-react'
 import type { DebugRunResult } from '@shared/types'
 import type { OpenConnection } from '../../stores/connectionsStore'
 import { statusColor } from '../../lib/connectionColors'
 
 /**
- * Barre d'état en bas de fenêtre, sur le modèle de celle des requêtes SSMS :
- * à gauche l'état de l'exécution avec une icône, à droite serveur (version),
- * utilisateur, base, durée (chronomètre pendant l'exécution), nombre de
- * lignes, puis la position du curseur. Elle prend la couleur choisie pour la
- * connexion, pour savoir d'un coup d'œil sur quel serveur on travaille.
+ * Barre d'état de la requête, sous les résultats, comme la barre jaune de
+ * SSMS : à gauche l'état de l'exécution, à droite serveur (version),
+ * utilisateur, base, durée (chronomètre pendant l'exécution) et nombre de
+ * lignes. Elle prend la couleur choisie pour la connexion, pour savoir d'un
+ * coup d'œil sur quel serveur on travaille.
  */
 
 /** « Microsoft SQL Server 2022 (RTM-CU12) - 16.0.4135.4 (X64) » → « 16.0 RTM-CU12 ». */
@@ -25,7 +35,7 @@ function hms(ms: number): string {
   return `${p(Math.floor(t / 3600))}:${p(Math.floor((t % 3600) / 60))}:${p(t % 60)}`
 }
 
-export default function StatusBar({
+export default function QueryStatusBar({
   connection,
   database,
   run,
@@ -34,9 +44,7 @@ export default function StatusBar({
   failed,
   cancelled,
   startedAt,
-  finishedAt,
-  selectionLines,
-  cursor
+  finishedAt
 }: {
   connection: OpenConnection | null
   database: string | null
@@ -51,8 +59,6 @@ export default function StatusBar({
   cancelled: boolean
   startedAt: Date | null
   finishedAt: Date | null
-  selectionLines: number
-  cursor: { line: number; column: number } | null
 }): JSX.Element {
   // Chronomètre : rafraîchi chaque seconde tant que l'exécution tourne.
   const [now, setNow] = useState(() => Date.now())
@@ -63,85 +69,77 @@ export default function StatusBar({
     return () => clearInterval(timer)
   }, [running])
 
-  const rows = run ? run.resultsets.reduce((n, rs) => n + rs.rows.length, 0) : null
+  const rows = run ? run.resultsets.reduce((n, rs) => n + rs.rows.length, 0) : 0
   const elapsed = startedAt
     ? (running ? now : (finishedAt?.getTime() ?? now)) - startedAt.getTime()
     : null
 
-  let icon = '🔌'
+  let Icon: LucideIcon = Plug
   let state = 'Connecté.'
-  let stateClass = 'idle'
+  let tone = 'idle'
   if (paused !== null) {
-    icon = '⏸'
+    Icon = CirclePause
     state = `En pause avant la ligne ${paused}.`
-    stateClass = 'busy'
+    tone = 'busy'
   } else if (running) {
-    icon = '⏳'
+    Icon = LoaderCircle
     state = 'Exécution de la requête en cours…'
-    stateClass = 'busy'
+    tone = 'busy'
   } else if (cancelled) {
-    icon = '✖'
+    Icon = CircleX
     state = 'Requête annulée.'
-    stateClass = 'err'
+    tone = 'err'
   } else if (failed || (run && run.errors.length > 0)) {
-    icon = '⚠'
+    Icon = TriangleAlert
     state = 'Requête terminée avec des erreurs.'
-    stateClass = 'err'
+    tone = 'err'
   } else if (run) {
-    icon = '✔'
+    Icon = CircleCheck
     state = 'Exécution de requête réussie.'
-    stateClass = 'ok'
+    tone = 'ok'
   } else if (!connection) {
-    icon = '⛔'
+    Icon = Unplug
     state = 'Déconnecté.'
   }
 
   const color = statusColor(connection)
+  const version = connection ? shortVersion(connection.version) : ''
 
   return (
     <footer
-      className={`status-bar${color ? ' colored' : ''}`}
+      className={`query-status${color ? ' colored' : ''}`}
       style={color ? { background: color } : undefined}
     >
-      <span className={`status-state ${stateClass}`}>
-        <span className="status-icon">{icon}</span> {state}
+      <span className={`qs-state ${tone}`}>
+        <Icon size={14} className={running && paused === null ? 'spin' : ''} aria-hidden="true" />
+        {state}
       </span>
-
-      <span className="status-spacer" />
-
-      {selectionLines > 0 && (
-        <span className="status-item accent" title="« Exécuter » ne lancera que la sélection">
-          sélection : {selectionLines} ligne(s)
-        </span>
-      )}
+      <span className="qs-spacer" />
       {connection && (
         <>
           {connection.production && (
-            <span className="status-item prod" title="Connexion marquée « production »">
-              ⚠ PROD
+            <span className="qs-item prod" data-tip="Connexion marquée « production »">
+              PRODUCTION
             </span>
           )}
-          <span className="status-item" title={connection.version}>
+          <span className="qs-item" data-tip={connection.version}>
             {connection.server}
-            {shortVersion(connection.version) && ` (${shortVersion(connection.version)})`}
+            {version && ` (${version})`}
           </span>
-          <span className="status-item" title="Compte de connexion">
+          <span className="qs-item" data-tip="Compte de connexion">
             {connection.user}
           </span>
-          <span className="status-item" title="Base de données de l'onglet actif">
+          <span className="qs-item" data-tip="Base de données de l'onglet">
             {database ?? connection.defaultDatabase}
           </span>
         </>
       )}
-      <span className="status-item mono" title="Durée de la dernière exécution">
+      <span className="qs-item mono" data-tip="Durée de la dernière exécution">
         {elapsed !== null ? hms(elapsed) : '00:00:00'}
       </span>
-      <span className="status-item">{rows ?? 0} ligne{(rows ?? 0) > 1 ? 's' : ''}</span>
-      {cursor && (
-        <span className="status-item mono status-cursor" title="Ligne et colonne du curseur">
-          Ln {cursor.line}  Col {cursor.column}
-        </span>
-      )}
+      <span className="qs-item" data-tip="Lignes renvoyées par la dernière exécution">
+        {rows} ligne{rows > 1 ? 's' : ''}
+      </span>
     </footer>
   )
 }

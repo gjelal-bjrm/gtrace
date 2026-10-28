@@ -1,13 +1,27 @@
 import { useReplayStore } from '../../stores/replayStore'
 import DataGrid from './DataGrid'
+import { Table2 } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 export default function ResultsPanel(): JSX.Element {
   const run = useReplayStore((s) => s.run)
   const currentStep = useReplayStore((s) => s.currentStep)
   const select = useReplayStore((s) => s.select)
 
-  if (!run) return <p className="hint">Exécuter d&apos;abord (▶) pour voir les resultsets.</p>
-  if (run.resultsets.length === 0) return <p className="hint">Aucun resultset métier produit.</p>
+  if (!run) {
+    return (
+      <EmptyState icon={Table2} title="Aucun résultat pour l'instant">
+        Exécutez la requête (F5) : les jeux de résultats de vos SELECT s&apos;afficheront ici.
+      </EmptyState>
+    )
+  }
+  if (run.resultsets.length === 0) {
+    return (
+      <EmptyState icon={Table2} title="La requête n'a renvoyé aucun jeu de résultats">
+        Le détail de l&apos;exécution (lignes affectées, erreurs) est dans l&apos;onglet Messages.
+      </EmptyState>
+    )
+  }
 
   return (
     <div className="tables">
@@ -17,10 +31,14 @@ export default function ResultsPanel(): JSX.Element {
           className={`resultset${rs.stepIndex === currentStep ? ' resultset-current' : ''}`}
         >
           <h3>
-            Resultset {rs.index + 1} — {rs.rows.length} ligne(s)
+            Jeu de résultats {rs.index + 1} · {rs.rows.length} ligne{rs.rows.length > 1 ? 's' : ''}
             {rs.stepIndex !== null && (
-              <button className="link-btn" onClick={() => select(rs.stepIndex!)}>
-                step {rs.stepIndex} ↗
+              <button
+                className="link-btn"
+                onClick={() => select(rs.stepIndex!)}
+                data-tip="Aller à l'étape qui a produit ces lignes dans la chronologie"
+              >
+                étape {rs.stepIndex + 1} ↗
               </button>
             )}
           </h3>

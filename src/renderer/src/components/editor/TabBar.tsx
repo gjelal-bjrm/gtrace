@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, FileCode2, LoaderCircle, Lock, Pin, X } from 'lucide-react'
 import { useEditorStore } from '../../stores/editorStore'
 import { useConnectionsStore } from '../../stores/connectionsStore'
+import { useExplorerStore } from '../../stores/explorerStore'
 import { tabLabel } from '../../lib/tabLabel'
-import { IconNewFile, IconOpenFolder, IconSave } from './icons'
+import TreeMenu from '../connections/TreeMenu'
 
 interface Props {
   /** Session de debug ou profilage live : on gèle l'ouverture/fermeture/bascule d'onglets. */
@@ -13,108 +15,135 @@ interface Props {
   onClose: (id: string) => void
   /** Clic droit sur un onglet (menu Fermer / Épingler / Copier le chemin…) */
   onTabMenu: (id: string, x: number, y: number) => void
-  onNew: () => void
-  onOpen: () => void
-  onSave: () => void
-  onSaveAs: () => void
 }
 
+/**
+ * Onglets de documents, sur le bandeau de SSMS : l'onglet actif est coloré et
+ * prolongé par un liseré sur toute la largeur ; « ▾ » à droite liste tous les
+ * documents ouverts quand ils ne tiennent plus dans la largeur.
+ */
 export default function TabBar({
   locked,
   onSwitch,
   runningTabId,
   onClose,
-  onTabMenu,
-  onNew,
-  onOpen,
-  onSave,
-  onSaveAs
+  onTabMenu
 }: Props): JSX.Element {
   const tabs = useEditorStore((s) => s.tabs)
   const activeId = useEditorStore((s) => s.activeId)
   const connections = useConnectionsStore((s) => s.connections)
+  // Comme SSMS, une seule zone « active » à la fois : quand l'explorateur a le
+  // focus, l'onglet de document s'atténue.
+  const inactive = useExplorerStore((s) => s.focusArea === 'explorer')
   const tabsRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLButtonElement>(null)
+  const [list, setList] = useState<{ x: number; y: number } | null>(null)
 
   // L'onglet actif reste visible (un nouvel onglet s'ajoute à droite, souvent hors champ).
   useEffect(() => {
     tabsRef.current
-      ?.querySelector('.editor-tab.active')
+      ?.querySelector('.doc-tab.active')
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [activeId, tabs.length])
 
   return (
-    <div className="tabbar">
-      <div className="tabbar-actions">
-        <button
-          className="tab-action-btn"
-          onClick={onNew}
-          disabled={locked}
-          title="Nouvel onglet (Ctrl+N)"
-        >
-          <IconNewFile />
-        </button>
-        <button
-          className="tab-action-btn"
-          onClick={onOpen}
-          disabled={locked}
-          title="Ouvrir un fichier (Ctrl+O)"
-        >
-          <IconOpenFolder />
-        </button>
-        <button className="tab-action-btn" onClick={onSave} title="Enregistrer (Ctrl+S)">
-          <IconSave />
-        </button>
-        <button
-          className="tab-action-btn tab-action-saveas"
-          onClick={onSaveAs}
-          title="Enregistrer sous… (Ctrl+Maj+S)"
-        >
-          <IconSave />
-          <span className="sa-plus">+</span>
-        </button>
-      </div>
-      <div className="tabbar-tabs" ref={tabsRef}>
+    <div className={`doc-tabs${inactive ? ' inactive' : ''}`}>
+      <div
+        className="doc-tabs-scroll"
+        ref={tabsRef}
+        role="tablist"
+        // Molette : défilement horizontal des onglets, comme les éditeurs à onglets.
+        onWheel={(e) => {
+          if (tabsRef.current && e.deltaY !== 0) tabsRef.current.scrollLeft += e.deltaY
+        }}
+      >
         {tabs.map((t) => {
           const label = tabLabel(t, connections.find((c) => c.id === t.connectionId) ?? null)
+          const running = t.id === runningTabId
           return (
-          <div
-            key={t.id}
-            className={`editor-tab${t.id === activeId ? ' active' : ''}`}
-            onClick={() => onSwitch(t.id)}
-            onAuxClick={(e) => {
-              // Clic molette : ferme l'onglet (usage courant des éditeurs à onglets).
-              if (e.button === 1 && !locked) onClose(t.id)
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              onTabMenu(t.id, e.clientX, e.clientY)
-            }}
-            title={t.filePath ? `${label.full}
-${t.filePath}` : label.full}
-          >
-            <span className="tab-title">
-              {t.pinned && <span className="tab-pin" title="Onglet épinglé">📌</span>}
-              <span className="tab-name">{t.title}</span>
-              <span className={`tab-target${t.connectionId ? '' : ' off'}`}> - {label.target}</span>
-              {t.dirty ? '*' : ''}
-              {t.id === runningTabId && <span className="tab-running"> Exécution…</span>}
-            </span>
-            <button
-              className="tab-close"
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose(t.id)
+            <div
+              key={t.id}
+              role="tab"
+              aria-selected={t.id === activeId}
+              className={`doc-tab${t.id === activeId ? ' active' : ''}${t.pinned ? ' pinned' : ''}`}
+              onClick={() => onSwitch(t.id)}
+              onAuxClick={(e) => {
+                // Clic molette : ferme l'onglet (usage courant des éditeurs à onglets).
+                if (e.button === 1 && !locked) onClose(t.id)
               }}
-              disabled={locked}
-              title="Fermer"
+              onContextMenu={(e) => {
+                e.preventDefault()
+                onTabMenu(t.id, e.clientX, e.clientY)
+              }}
+              data-tip={t.filePath ? `${label.full} — ${t.filePath}` : label.full}
             >
-              ×
-            </button>
-          </div>
+              {running ? (
+                <LoaderCircle size={13} className="doc-tab-icon spin" aria-hidden="true" />
+              ) : (
+                <FileCode2 size={13} className="doc-tab-icon" aria-hidden="true" />
+              )}
+              <span className="doc-tab-title">
+                <span className="doc-tab-name">{t.title}</span>
+                <span className={`doc-tab-target${t.connectionId ? '' : ' off'}`}>
+                  {' '}
+                  - {label.target}
+                </span>
+                {t.dirty ? '*' : ''}
+                {running && <span className="doc-tab-running"> Exécution…</span>}
+              </span>
+              {t.pinned && <Pin size={12} className="doc-tab-pin" aria-label="Onglet épinglé" />}
+              <button
+                type="button"
+                className="doc-tab-close"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose(t.id)
+                }}
+                aria-label={`Fermer ${t.title}`}
+                aria-disabled={locked || undefined}
+                data-tip="Fermer"
+                data-shortcut="Ctrl+W"
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            </div>
           )
         })}
       </div>
-      {locked && <span className="tabbar-lock">session active — onglets gelés</span>}
+      {locked && (
+        <span
+          className="doc-tabs-lock"
+          data-tip="Exécution ou débogage en cours : les onglets sont gelés jusqu'à la fin"
+          aria-label="Onglets gelés pendant l'exécution"
+        >
+          <Lock size={13} aria-hidden="true" />
+        </span>
+      )}
+      <button
+        ref={listRef}
+        type="button"
+        className="doc-tabs-list"
+        data-tip="Tous les documents ouverts"
+        onClick={() => {
+          const r = listRef.current?.getBoundingClientRect()
+          if (r) setList({ x: r.right - 280, y: r.bottom + 2 })
+        }}
+      >
+        <ChevronDown size={14} aria-hidden="true" />
+      </button>
+      {list && (
+        <TreeMenu
+          x={list.x}
+          y={list.y}
+          onClose={() => setList(null)}
+          items={tabs.map((t) => ({
+            label: `${t.title}${t.dirty ? '*' : ''}`,
+            checked: t.id === activeId,
+            disabled: locked && t.id !== activeId,
+            onClick: () => onSwitch(t.id)
+          }))}
+        />
+      )}
     </div>
   )
 }

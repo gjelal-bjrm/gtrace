@@ -1,5 +1,7 @@
 import type { JSX } from 'react'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { Check, CircleHelp, Gauge, Play } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 /**
  * Aide intégrée : à quoi sert chaque bouton, chaque panneau, et comment mener
@@ -13,18 +15,28 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
   return (
     <div className="modal-overlay">
       <div className="modal help-dialog">
-        <div className="modal-header">
-          <span>❓ Comment utiliser GTrace</span>
-          <button className="btn btn-icon" onClick={onClose} title="Fermer">
-            ✕
-          </button>
-        </div>
+        <ModalHeader icon={CircleHelp} title="Comment utiliser GTrace" onClose={onClose} />
 
         <div className="modal-body help-body">
+          <h3>Où sont les choses</h3>
+          <p className="help-para">
+            La disposition reprend celle de SQL Server Management Studio : les menus et deux barres
+            d&apos;outils en haut (la seconde porte la connexion, la <strong>liste des bases</strong>{' '}
+            et le bouton <strong>Exécuter</strong>), l&apos;<strong>Explorateur d&apos;objets</strong>{' '}
+            à gauche, les onglets de requêtes au centre, les <strong>Résultats</strong> et{' '}
+            <strong>Messages</strong> en dessous, puis la barre d&apos;état de la requête (serveur,
+            base, durée, lignes) et la barre d&apos;état générale (ligne et colonne du curseur).
+            Ce qui est propre à GTrace vient en plus : les onglets Paramètres, Variables, Données,
+            Inspect et Profil, et la chronologie. Une commande introuvable ?{' '}
+            <span className="help-key">Ctrl+Q</span> et tapez son nom.
+          </p>
+
           <h3>Les trois façons de lancer du SQL</h3>
           <div className="help-cards">
             <div className="help-card">
-              <div className="help-card-title run">▶ Exécuter <span className="help-key">F5</span></div>
+              <div className="help-card-title run">
+                <Play size={14} aria-hidden="true" /> Exécuter <span className="help-key">F5</span>
+              </div>
               <p>
                 Lance le SQL <strong>et enregistre une trace pas à pas</strong> : chaque
                 instruction exécutée, les variables qu&apos;elle a modifiées, ses résultats.
@@ -37,19 +49,23 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
             </div>
 
             <div className="help-card">
-              <div className="help-card-title">🔍 Analyser</div>
+              <div className="help-card-title">
+                <Check size={14} aria-hidden="true" /> Analyser <span className="help-key">Ctrl+F5</span>
+              </div>
               <p>
                 <strong>Ne touche pas au serveur.</strong> Vérifie la syntaxe, découpe le script en
                 instructions et repère les paramètres de la procédure.
               </p>
               <p className="help-tip">
                 À utiliser pour valider un script avant de le lancer, ou pour faire apparaître les
-                champs de paramètres dans l&apos;onglet <em>Exécution</em>.
+                champs de paramètres dans l&apos;onglet <em>Paramètres</em>.
               </p>
             </div>
 
             <div className="help-card">
-              <div className="help-card-title">⚡ Profiler</div>
+              <div className="help-card-title">
+                <Gauge size={14} aria-hidden="true" /> Profiler
+              </div>
               <p>
                 Exécute le SQL <strong>tel quel, sans instrumentation</strong>, et mesure le temps
                 réellement passé sur chaque ligne.
@@ -65,23 +81,26 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
           <h3>Déboguer pas à pas, avec des points d&apos;arrêt</h3>
           <ol className="help-steps">
             <li>
-              Dans l&apos;explorateur à gauche, ouvrez <em>Procédures stockées</em> et cliquez sur
-              l&apos;icône <strong>🐞</strong> de la procédure : son code s&apos;ouvre dans un onglet.
+              Dans l&apos;explorateur à gauche, ouvrez <em>Procédures stockées</em>, faites un clic
+              droit sur la procédure puis <strong>Déboguer</strong> (ou double-cliquez dessus) : son
+              code s&apos;ouvre dans un onglet.
             </li>
             <li>
-              Renseignez ses paramètres dans l&apos;onglet <strong>Exécution</strong>.
+              Renseignez ses paramètres dans l&apos;onglet <strong>Paramètres</strong>.
             </li>
             <li>
-              <strong>Cliquez dans la marge grise</strong>, à gauche du numéro de ligne : un point
-              rouge apparaît. C&apos;est votre point d&apos;arrêt.
+              <strong>Cliquez dans la marge grise</strong>, à gauche du numéro de ligne, ou appuyez
+              sur <span className="help-key">F9</span> : un point rouge apparaît. C&apos;est votre
+              point d&apos;arrêt.
             </li>
             <li>
-              Le bouton devient <strong>▶ Déboguer</strong>. Lancez-le : l&apos;exécution
-              s&apos;arrête sur chaque point d&apos;arrêt.
+              Le bouton vert devient <strong>Déboguer</strong>. Lancez-le : l&apos;exécution
+              s&apos;arrête sur chaque point d&apos;arrêt, et un bandeau l&apos;annonce.
             </li>
             <li>
               À la pause, consultez <strong>Variables</strong> et <strong>Inspect</strong>, puis
-              <strong> Continuer</strong> ou <strong>Step</strong> pour avancer.
+              <strong> Continuer</strong> (<span className="help-key">F5</span>) ou{' '}
+              <strong>Pas à pas</strong> (<span className="help-key">F10</span>) pour avancer.
             </li>
           </ol>
           <p className="help-note">
@@ -101,7 +120,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
             </thead>
             <tbody>
               <tr>
-                <td className="help-pane">Exécution</td>
+                <td className="help-pane">Paramètres</td>
                 <td>
                   Les paramètres de la procédure, les options (mode lecture seule, tables à
                   suivre), l&apos;export de session et le diagnostic assisté.
@@ -151,7 +170,7 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                 <td className="help-pane">Profil</td>
                 <td>Le temps passé par ligne, du plus lent au plus rapide.</td>
                 <td>
-                  Après un <strong>⚡ Profiler</strong> uniquement.
+                  Après un <strong>Profiler</strong> uniquement.
                 </td>
               </tr>
             </tbody>
@@ -168,8 +187,8 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
             <strong>Cliquez une case</strong> pour revenir à ce moment : l&apos;éditeur surligne la
             ligne concernée et l&apos;onglet <em>Variables</em> reprend les valeurs qu&apos;elles
             avaient <em>à cet instant</em>. C&apos;est tout l&apos;intérêt du voyage dans le
-            temps : on rejoue l&apos;exécution sans relancer la requête. Les flèches{' '}
-            <span className="help-key">⏮ ◀ ▶ ⏭</span> font la même chose au clavier avec{' '}
+            temps : on rejoue l&apos;exécution sans relancer la requête. Les boutons de la
+            chronologie font la même chose, et au clavier{' '}
             <span className="help-key">F10</span> et <span className="help-key">Maj+F10</span>.
           </p>
 
@@ -214,10 +233,11 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                 </td>
               </tr>
               <tr>
-                <td>Ouvrir / Enregistrer</td>
+                <td>Ouvrir / Enregistrer / Enregistrer tout</td>
                 <td>
                   <span className="help-key">Ctrl+O</span> /{' '}
-                  <span className="help-key">Ctrl+S</span>
+                  <span className="help-key">Ctrl+S</span> /{' '}
+                  <span className="help-key">Ctrl+Maj+S</span>
                 </td>
                 <td>Fermer l&apos;onglet</td>
                 <td>
@@ -253,6 +273,28 @@ export default function HelpDialog({ onClose }: { onClose: () => void }): JSX.El
                 <td>Explorateur d&apos;objets</td>
                 <td>
                   <span className="help-key">F8</span>
+                </td>
+              </tr>
+              <tr>
+                <td>Point d&apos;arrêt sur la ligne</td>
+                <td>
+                  <span className="help-key">F9</span>
+                </td>
+                <td>Pendant une pause : continuer / pas à pas</td>
+                <td>
+                  <span className="help-key">F5</span> /{' '}
+                  <span className="help-key">F10</span>
+                </td>
+              </tr>
+              <tr>
+                <td>Rechercher une commande</td>
+                <td>
+                  <span className="help-key">Ctrl+Q</span>
+                </td>
+                <td>Onglet suivant / précédent</td>
+                <td>
+                  <span className="help-key">Ctrl+Tab</span> /{' '}
+                  <span className="help-key">Ctrl+Maj+Tab</span>
                 </td>
               </tr>
             </tbody>

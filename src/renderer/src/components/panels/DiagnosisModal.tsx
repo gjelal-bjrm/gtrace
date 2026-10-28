@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AiConfig, ConnectionRef, HistorySaveInput, ResultSetData } from '@shared/types'
 import { formatSqlValue } from '../../stores/replayStore'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { Stethoscope } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 interface Props {
   activeRef: ConnectionRef | null
@@ -90,12 +92,7 @@ export default function DiagnosisModal({ activeRef, buildInput, onClose }: Props
   return (
     <div className="modal-overlay">
       <div className="modal ai-activity">
-        <div className="modal-header">
-          <span>🩺 Diagnostic IA de la session</span>
-          <button className="link-btn" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+        <ModalHeader icon={Stethoscope} title="Diagnostic IA de la session" onClose={onClose} />
 
         <div className="modal-body">
           {config && (

@@ -2,6 +2,8 @@ import type { JSX } from 'react'
 import { useAppearanceStore } from '../../stores/appearanceStore'
 import { THEMES } from '../../theme/themes'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { Palette } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 /**
  * Dialogue « Apparence » : choix du thème parmi des palettes prédéfinies
@@ -18,12 +20,7 @@ export default function ThemeDialog({ onClose }: { onClose: () => void }): JSX.E
   return (
     <div className="modal-overlay">
       <div className="modal theme-dialog">
-        <div className="modal-header">
-          <span>🎨 Apparence</span>
-          <button className="btn btn-icon" onClick={onClose} title="Fermer">
-            ✕
-          </button>
-        </div>
+        <ModalHeader icon={Palette} title="Apparence" onClose={onClose} />
 
         <div className="modal-body">
           <div className="theme-grid">
@@ -34,19 +31,23 @@ export default function ThemeDialog({ onClose }: { onClose: () => void }): JSX.E
                 onClick={() => update({ themeId: t.id })}
                 title={t.tagline}
               >
-                {/* Aperçu : une mini-fenêtre peinte avec les couleurs du thème. */}
-                <span className="theme-preview" style={{ background: t.vars.bg }}>
-                  <span className="theme-preview-bar" style={{ background: t.vars['bg-panel'] }}>
-                    <span className="theme-dot" style={{ background: t.vars.accent }} />
+                {/* Aperçu : une mini-fenêtre peinte avec les couleurs du thème —
+                    barres, onglets, éditeur, barre de requête, barre d'état. */}
+                <span className="theme-preview" style={{ background: t.vars.chrome }}>
+                  <span className="tp-band" style={{ background: t.vars.band }}>
+                    <span className="tp-tab" style={{ background: t.vars['tab-active'] }} />
+                    <span className="tp-tab off" style={{ background: t.vars['band-fg'] }} />
                   </span>
-                  <span className="theme-preview-body">
-                    <span className="theme-line" style={{ background: t.vars.text, width: '62%' }} />
+                  <span className="tp-body" style={{ background: t.vars.surface }}>
+                    <span className="theme-line" style={{ background: t.vars.accent, width: '46%' }} />
+                    <span className="theme-line" style={{ background: t.vars.text, width: '64%' }} />
                     <span
                       className="theme-line"
-                      style={{ background: t.vars['text-dim'], width: '40%' }}
+                      style={{ background: t.vars['text-dim'], width: '38%' }}
                     />
-                    <span className="theme-line" style={{ background: t.vars.run, width: '52%' }} />
                   </span>
+                  <span className="tp-query" style={{ background: t.vars.querybar }} />
+                  <span className="tp-status" style={{ background: t.vars.statusbar }} />
                 </span>
                 <span className="theme-name">{t.label}</span>
                 <span className="theme-tagline">{t.tagline}</span>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { McpAuditEntry, McpConnection } from '@shared/types'
 import type { OpenConnection } from '../../stores/connectionsStore'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { Bot } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 interface Props {
   /** Connexion active (celle de l'onglet courant), ou null si non connecté. */
@@ -122,12 +124,7 @@ export default function AiActivityPanel({ activeConnection, onClose }: Props): J
   return (
     <div className="modal-overlay">
       <div className="modal ai-activity">
-        <div className="modal-header">
-          <span>🤖 Accès de l&apos;IA à vos données</span>
-          <button className="btn btn-icon" onClick={onClose} title="Fermer">
-            ✕
-          </button>
-        </div>
+        <ModalHeader icon={Bot} title="Accès de l'IA à vos données" onClose={onClose} />
 
         <div className="modal-body">
           {error && <div className="error-box">{error}</div>}

@@ -15,7 +15,7 @@
   --error-dim: rgba(217, 108, 108, 0.14);
   --ok: #7dbb7d;
   --mono: 'JetBrains Mono', Consolas, 'Cascadia Mono', monospace;
-  --ui: 'Segoe UI', system-ui, sans-serif;
+  --ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   /* Valeurs de repli : surchargées par le thème actif (theme/applyTheme.ts). */
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: rgba(0, 0, 0, 0.5);
@@ -26,6 +26,22 @@
   --heat-3: #d96c6c;
   --ui-font-size: 13px;
   --row-pad: 5px;
+  /* Coque façon SSMS (barres, onglets, barres d'état) : valeurs du thème
+     « Ambre sombre », remplacées par celles du thème actif. */
+  --chrome: #1f2229;
+  --chrome-border: #2b2f37;
+  --band: #121419;
+  --band-fg: #9aa0aa;
+  --band-hover: rgba(255, 255, 255, 0.06);
+  --tab-active: #d9a441;
+  --tab-active-fg: #16181d;
+  --querybar: #3a321d;
+  --querybar-fg: #ecd9a5;
+  --statusbar: #c4912f;
+  --statusbar-fg: #17140c;
+  --accent-fg: #16181d;
+  --surface: #14161a;
+  --run-fg: #ffffff;
 }
 
 * {
@@ -46,12 +62,6 @@ body {
   font-family: var(--ui);
   font-size: var(--ui-font-size);
   overflow: hidden;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 
 /* ─── Système de boutons cohérent ────────────────────────────────────────── */
@@ -103,7 +113,7 @@ body {
 .btn-run {
   border-color: var(--run);
   background: var(--run);
-  color: #0c130e;
+  color: var(--run-fg);
   font-weight: 600;
 }
 
@@ -151,11 +161,11 @@ body {
 }
 
 /*
- * Base élément (spécificité 0,0,1) pour les boutons/selects « nus » des panneaux.
- * Toute classe (.btn, .link-btn, .tree-*, .tabs button…) la surcharge naturellement.
+ * Base des boutons/selects « nus » des panneaux, en :where() (spécificité
+ * nulle) : toute classe (.btn, .tool-btn, .tree-twisty…) la surcharge, y
+ * compris au survol.
  */
-select,
-button {
+:where(select, button) {
   background: var(--bg-input);
   color: var(--text);
   border: 1px solid var(--border);
@@ -166,15 +176,18 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
+:where(button:hover:not(:disabled)) {
   border-color: var(--accent);
 }
 
-button:disabled {
+:where(button:disabled) {
   opacity: 0.5;
 }
 
 .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: none;
   background: transparent;
   color: var(--text-dim);
@@ -193,63 +206,6 @@ button:disabled {
 
 .spacer {
   flex: 1;
-}
-
-/* ─── Barre de titre ─────────────────────────────────────────────────────── */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Lockup « M2 » : icône G-rewind + GTrace bicolore + légende. */
-.wordmark {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.wordmark svg {
-  display: block;
-  border-radius: 6px;
-}
-
-.wordmark-name {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text);
-}
-
-.wordmark-tagline {
-  color: var(--text-dim);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  margin-left: 9px;
-  transform: translateY(1px);
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.app-version {
-  font-size: 11px;
-  color: var(--text-dim);
 }
 
 /* ─── Bandeau de mise à jour ─────────────────────────────────────────────── */
@@ -353,124 +309,6 @@ button:disabled {
   font-size: 13px;
 }
 
-.sidecar-status {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.sidecar-status.ok::before,
-.sidecar-status.ko::before {
-  content: '●';
-  margin-right: 6px;
-}
-
-.sidecar-status.ok::before {
-  color: var(--ok);
-}
-
-.sidecar-status.ko::before {
-  color: var(--error);
-}
-
-/* ─── Barre d'outils ─────────────────────────────────────────────────────── */
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-}
-
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.conn-picker {
-  min-width: 170px;
-  max-width: 260px;
-  font-weight: 500;
-}
-
-.db-picker {
-  min-width: 130px;
-  max-width: 220px;
-  border-color: var(--accent) !important;
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.db-picker:disabled {
-  border-color: var(--border) !important;
-  color: var(--text-dim);
-  font-weight: 400;
-}
-
-.compat-select {
-  min-width: 96px;
-}
-
-.prod-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--error);
-  border: 1px solid var(--error);
-  border-radius: 3px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-
-.ro-badge {
-  font-size: 11px;
-  color: var(--ok);
-  border: 1px solid var(--ok);
-  border-radius: 3px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-
-/* ─── Bannières & toasts ─────────────────────────────────────────────────── */
-
-.session-banner {
-  padding: 7px 14px;
-  font-size: 12px;
-  font-family: var(--mono);
-  border-bottom: 1px solid var(--border);
-}
-
-.session-banner.running {
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-.session-banner.paused {
-  background: var(--error-dim);
-  color: var(--text);
-  border-bottom-color: var(--accent);
-}
-
-.error-toast {
-  padding: 8px 14px;
-  background: var(--error-dim);
-  border-bottom: 1px solid var(--error);
-  color: var(--error);
-  font-family: var(--mono);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.notice-toast {
-  padding: 7px 14px;
-  background: var(--accent-dim);
-  border-bottom: 1px solid var(--accent);
-  color: var(--accent);
-  font-size: 12px;
-  cursor: pointer;
-}
-
 /* ─── Modales ────────────────────────────────────────────────────────────── */
 
 .modal-overlay {
@@ -562,6 +400,9 @@ button:disabled {
 }
 
 .saved-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -631,553 +472,6 @@ button:disabled {
   margin-top: 18px;
 }
 
-/* ─── Espace de travail ──────────────────────────────────────────────────── */
-
-.workspace {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-/* ─── Poignées de redimensionnement ──────────────────────────────────────── */
-
-.splitter {
-  flex-shrink: 0;
-  background: transparent;
-  transition: background 0.12s;
-  z-index: 5;
-}
-
-.splitter-x {
-  width: 6px;
-  margin: 0 -3px;
-  cursor: col-resize;
-}
-
-.splitter-y {
-  height: 6px;
-  margin: -3px 0;
-  cursor: row-resize;
-}
-
-.splitter:hover {
-  background: var(--accent);
-}
-
-/* ─── Explorateur d'objets (type SSMS) ───────────────────────────────────── */
-
-.explorer-pane {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.object-explorer {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.explorer-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.explorer-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-}
-
-.explorer-error {
-  margin: 8px;
-}
-
-.tree {
-  flex: 1;
-  overflow: auto;
-  padding: 4px 0;
-  user-select: none;
-}
-
-.tree-empty {
-  padding: 16px 12px;
-}
-
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 23px;
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--text);
-}
-
-.tree-row:hover {
-  background: var(--bg-hover);
-}
-
-/* Élément sélectionné : c'est lui dont Ctrl+N reprend le serveur et la base. */
-.tree-row[data-selected] {
-  background: var(--accent-dim);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.tree-root {
-  font-weight: 600;
-}
-
-.tree-twisty {
-  flex: 0 0 14px;
-  width: 14px;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 9px;
-  cursor: pointer;
-  padding: 0;
-  text-align: center;
-}
-
-.tree-twisty:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.tree-icon {
-  flex: 0 0 16px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.tree-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tree-label.tree-default {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.tree-label.tree-group {
-  color: var(--text-dim);
-}
-
-.tree-meta {
-  color: var(--text-dim);
-  font-size: 11px;
-  padding: 0 8px 0 6px;
-  font-family: var(--mono);
-}
-
-.tree-leaf .tree-label {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 11px;
-}
-
-.tree-actions {
-  display: none;
-  align-items: center;
-  gap: 2px;
-  padding-right: 6px;
-}
-
-.tree-row:hover .tree-actions {
-  display: flex;
-}
-
-.tree-action {
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 4px;
-  border-radius: 3px;
-}
-
-.tree-action:hover:not(:disabled) {
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-.tree-loading {
-  color: var(--text-dim);
-  font-size: 11px;
-  font-style: italic;
-  padding: 3px 0;
-}
-
-/* ─── Historique (bas du panneau gauche) ─────────────────────────────────── */
-
-.history-panel {
-  flex-shrink: 0;
-  max-height: 34%;
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  border: none;
-  background: var(--bg-panel);
-  color: var(--text-dim);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 7px 10px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.section-header:hover {
-  color: var(--text);
-}
-
-.history-list {
-  list-style: none;
-  overflow: auto;
-}
-
-.history-list li {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.history-list li.hint {
-  padding: 8px 12px;
-}
-
-.history-empty {
-  font-size: 11.5px;
-  line-height: 1.45;
-}
-
-/* Compteur discret : n'apparaît que s'il y a des exécutions enregistrées. */
-.history-count {
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--accent-dim);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.history-item {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  padding: 4px 10px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.history-item:hover {
-  background: var(--bg-hover);
-}
-
-.history-title {
-  font-size: 12px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.history-meta {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-/* ─── Éditeur & onglets ──────────────────────────────────────────────────── */
-
-.editor-pane {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
-}
-
-.editor-body {
-  flex: 1;
-  min-height: 0;
-}
-
-.editor-host {
-  width: 100%;
-  height: 100%;
-}
-
-.tabbar {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  min-height: 36px;
-}
-
-.tabbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  border-right: 1px solid var(--border);
-}
-
-.tab-action-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 26px;
-  padding: 0 5px;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.tab-action-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.tab-action-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.tab-action-saveas {
-  min-width: 32px;
-}
-
-.sa-plus {
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--accent);
-  margin-left: 1px;
-  margin-top: -6px;
-}
-
-.tabbar-tabs {
-  display: flex;
-  align-items: stretch;
-  overflow-x: auto;
-  flex: 1;
-}
-
-.editor-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px 0 12px;
-  border-right: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  max-width: 360px;
-}
-
-.editor-tab:hover {
-  background: var(--bg);
-}
-
-.editor-tab.active {
-  background: var(--bg-input);
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.editor-tab .tab-title {
-  display: flex;
-  min-width: 0;
-}
-
-/* Le nom du fichier se raccourcit en premier : « serveur.base » reste lisible. */
-.editor-tab .tab-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-target {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  white-space: pre;
-}
-
-.tab-target.off {
-  font-style: italic;
-}
-
-.tab-close {
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 14px;
-  line-height: 1;
-  padding: 0 2px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.tab-close:hover:not(:disabled) {
-  background: var(--error-dim);
-  color: var(--error);
-}
-
-.tabbar-lock {
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-/* ─── Panneau droit à onglets ────────────────────────────────────────────── */
-
-/* Colonne principale (disposition SSMS) : éditeur au-dessus, résultats dessous. */
-.main-area {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  /* min-width:0 indispensable : sans lui, une table large étire la colonne
-     au-delà de la fenêtre (body overflow:hidden) → plus de scroll possible. */
-  min-width: 0;
-  min-height: 0;
-}
-
-.results-pane {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  min-width: 0;
-  min-height: 0;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-}
-
-/* Résultats agrandis : occupent toute la colonne (l'éditeur est masqué). */
-/* Ctrl+R : volet masqué, l'éditeur prend toute la hauteur (display:flex
-   l'emporterait sinon sur l'attribut hidden). */
-.results-pane[hidden] {
-  display: none;
-}
-
-.results-pane.maximized {
-  flex: 1 1 auto;
-  height: auto !important;
-}
-
-.tabs {
-  display: flex;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.tabs button {
-  flex: 1 1 0;
-  min-width: 0;
-  border: none;
-  border-radius: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  padding: 8px 3px;
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tabs button:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--bg-hover);
-}
-
-.tabs button.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.tab-count {
-  color: var(--text-dim);
-  font-size: 10px;
-  margin-left: 3px;
-}
-
-.tabs button.active .tab-count {
-  color: var(--accent);
-}
-
-/* Bascule plein écran données : ne s'étire pas, distincte à droite. */
-.tabs .focus-toggle {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 8px 12px;
-  font-size: 11px;
-  white-space: nowrap;
-  color: var(--text-dim);
-  border-left: 1px solid var(--border);
-}
-
-.tabs .focus-toggle:hover:not(:disabled) {
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-
-.tabs .focus-toggle.active {
-  color: var(--accent);
-  background: var(--accent-dim);
-  border-bottom-color: transparent;
-}
-
-.tab-content {
-  flex: 1;
-  overflow: auto;
-  padding: 12px;
-}
-
 /* ─── Tables / contenus des panneaux ─────────────────────────────────────── */
 
 .hint {
@@ -1185,12 +479,42 @@ button:disabled {
   line-height: 1.5;
 }
 
+/* Panneau encore vide : icône, titre, phrase d'action, centrés. */
+.empty-state {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100%;
+  padding: 28px 24px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.empty-state > svg {
+  margin-bottom: 2px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.empty-text {
+  max-width: 540px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .tables h3 {
-  margin: 14px 0 6px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent);
+  margin: 12px 0 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-dim);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1313,10 +637,17 @@ th {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  min-height: 0;
 }
 
-.results-pane .resultset,
+/* Plusieurs jeux de résultats se partagent la hauteur à parts égales, comme
+   dans SSMS, sans descendre sous une hauteur lisible : au-delà, le volet défile. */
+.results-pane .resultset {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 170px;
+}
+
 .results-pane .grid-block {
   display: flex;
   flex-direction: column;
@@ -1326,7 +657,7 @@ th {
 
 .results-pane .grid-scroll {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
 }
 
 /* Largeur intrinsèque : les colonnes ne sont pas compressées, on défile. */
@@ -1424,83 +755,6 @@ th {
 
 /* ─── Menu contextuel de la grille ───────────────────────────────────────── */
 
-.ctx-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-}
-
-.ctx-menu {
-  position: fixed;
-  z-index: 201;
-  min-width: 210px;
-  max-width: 260px;
-  padding: 4px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  box-shadow: 0 10px 28px var(--shadow);
-  font-size: 12px;
-}
-
-.ctx-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.ctx-item:hover {
-  background: var(--bg-hover);
-}
-
-.ctx-sep {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--border);
-}
-
-.ctx-label {
-  padding: 4px 10px 2px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-}
-
-.ctx-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 4px 10px 6px;
-  align-items: center;
-}
-
-.ctx-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  border: 1px solid var(--border-strong);
-  cursor: pointer;
-}
-
-.ctx-swatch:hover {
-  border-color: var(--text);
-}
-
-.ctx-swatch.none {
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  color: var(--text-dim);
-  background: var(--bg-input);
-}
-
 .readonly-toggle,
 .prod-toggle {
   font-size: 12px;
@@ -1516,7 +770,6 @@ th {
 }
 
 /* Panneaux MCP / IA */
-
 .grant-row {
   display: flex;
   align-items: center;
@@ -1623,40 +876,6 @@ th {
 
 /* ─── Timeline ───────────────────────────────────────────────────────────── */
 
-.timeline-container {
-  flex-shrink: 0;
-  /* Plancher : garantit que transport + piste des steps tiennent sans être rognés. */
-  min-height: 96px;
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-}
-
-.timeline-bar {
-  height: 100%;
-  background: var(--bg-panel);
-  padding: 6px 14px 10px;
-  overflow: auto;
-}
-
-.transport {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.transport button {
-  padding: 2px 10px;
-  font-size: 13px;
-}
-
-.step-label {
-  margin-left: 10px;
-  font-size: 12px;
-  color: var(--text-dim);
-  font-family: var(--mono);
-}
-
 .steps-strip {
   display: flex;
   align-items: flex-start;
@@ -1687,18 +906,6 @@ th {
 }
 
 /* ─── Aides à la navigation dans les longues procédures ──────────────────── */
-
-/* Bandeau fin sous les onglets : fil d'Ariane + repli du code non exécuté. */
-.editor-strip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 3px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-  min-height: 26px;
-}
 
 .breadcrumb {
   display: flex;
@@ -1816,9 +1023,20 @@ th {
 }
 
 .help-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
   font-size: 13px;
   color: var(--text);
+}
+
+.help-card-title svg {
+  color: var(--accent);
+}
+
+.help-card-title.run svg {
+  color: var(--run);
 }
 
 .help-card-title.run {
@@ -2004,6 +1222,9 @@ th {
 .theme-card {
   display: flex;
   flex-direction: column;
+  /* Chromium aligne le contenu des <button> à gauche par défaut : l'aperçu
+     se réduisait à une fine bande. */
+  align-items: stretch;
   gap: 4px;
   padding: 8px;
   text-align: left;
@@ -2024,31 +1245,47 @@ th {
 }
 
 .theme-preview {
-  display: block;
-  height: 74px;
-  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  height: 84px;
+  padding-top: 7px;
   border: 1px solid var(--border);
+  border-radius: 6px;
   overflow: hidden;
 }
 
-.theme-preview-bar {
+.tp-band {
   display: flex;
-  align-items: center;
-  height: 16px;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  height: 13px;
   padding: 0 6px;
 }
 
-.theme-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.tp-tab {
+  width: 34px;
+  height: 9px;
+  border-radius: 3px 3px 0 0;
 }
 
-.theme-preview-body {
+.tp-tab.off {
+  width: 26px;
+  opacity: 0.35;
+}
+
+.tp-body {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 8px;
+  gap: 5px;
+  padding: 8px;
+}
+
+.tp-query,
+.tp-status {
+  flex-shrink: 0;
+  height: 6px;
 }
 
 .theme-line {
@@ -2093,62 +1330,6 @@ th {
   margin-top: 0;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
-}
-
-/* ─── Barre d'état (bas de fenêtre, façon SSMS) ──────────────────────────── */
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-  padding: 4px 12px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel);
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.status-state {
-  font-weight: 600;
-  padding: 1px 8px;
-  border-radius: 3px;
-}
-
-.status-state.ok {
-  color: var(--ok);
-  background: color-mix(in srgb, var(--ok) 20%, transparent);
-}
-
-.status-state.busy {
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-
-.status-state.err {
-  color: var(--error);
-  background: var(--error-dim);
-}
-
-.status-item {
-  white-space: nowrap;
-}
-
-.status-item.accent {
-  color: var(--accent);
-}
-
-.status-item.prod {
-  color: var(--error);
-  font-weight: 600;
-}
-
-.status-item.dimmed {
-  opacity: 0.75;
-}
-
-.status-spacer {
-  flex: 1;
 }
 
 /* ─── Décorations Monaco ─────────────────────────────────────────────────── */
@@ -2225,9 +1406,17 @@ th {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
   font-size: 10.5px;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+/* Fenêtre étroite : la phrase d'aide se raccourcit avant le reste. */
+.legend-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .legend-scale,
@@ -2315,7 +1504,7 @@ th {
   white-space: pre;
 }
 
-/* ─── Lot 2 : Messages et grille façon SSMS ─────────────────────────────── */
+/* ─── Grille : NULL et colonne sélectionnée ; onglet Messages ────────────── */
 
 /* NULL en toutes lettres sur fond jaune pâle, pour le distinguer d'un texte vide. */
 .data-grid tbody tr td.cell-null:not(.col-selected) {
@@ -2335,19 +1524,6 @@ th {
 
 .data-grid thead th.clickable {
   cursor: pointer;
-}
-
-.ctx-key {
-  float: right;
-  margin-left: 18px;
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-.tab-count.error,
-.tabs button.active .tab-count.error {
-  color: var(--error);
-  font-weight: 600;
 }
 
 .messages {
@@ -2376,50 +1552,7 @@ th {
   background: var(--accent-dim);
 }
 
-/* ─── Lot 3 : barre d'état façon SSMS ───────────────────────────────────── */
-
-.status-state.idle {
-  color: var(--text-dim);
-}
-
-.status-icon {
-  display: inline-block;
-  width: 1.2em;
-  text-align: center;
-}
-
-.status-item.mono {
-  font-family: var(--mono);
-  white-space: pre;
-}
-
-.status-cursor {
-  padding-left: 10px;
-  border-left: 1px solid var(--border);
-}
-
-/* Couleur choisie pour la connexion (comme l'option de SSMS) : texte blanc,
-   pastilles d'état en blanc translucide pour rester lisibles sur la teinte. */
-.status-bar.colored {
-  color: #fff;
-  border-top-color: transparent;
-}
-
-.status-bar.colored .status-state,
-.status-bar.colored .status-item.accent,
-.status-bar.colored .status-item.prod {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.status-bar.colored .status-cursor {
-  border-left-color: rgba(255, 255, 255, 0.35);
-}
-
-.tab-running {
-  color: var(--accent);
-  font-style: italic;
-}
+/* ─── Dialogue de connexion : couleur de la connexion ────────────────────── */
 
 .color-swatches {
   display: flex;
@@ -2448,128 +1581,7 @@ th {
   outline-offset: 2px;
 }
 
-/* ─── Lot 4 : explorateur d'objets façon SSMS ───────────────────────────── */
-
-.tree-menu {
-  max-width: 340px;
-}
-
-.ctx-entry {
-  position: relative;
-}
-
-.ctx-item:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.ctx-bold {
-  font-weight: 700;
-}
-
-.ctx-arrow {
-  float: right;
-  margin-left: 14px;
-  color: var(--text-dim);
-}
-
-/* Sous-menu : s'ouvre à droite de l'entrée survolée. */
-.ctx-menu.ctx-submenu {
-  position: absolute;
-  left: calc(100% + 2px);
-  top: -5px;
-  max-width: 300px;
-  white-space: nowrap;
-}
-
-.tree-filter {
-  padding-top: 2px;
-  padding-bottom: 4px;
-  padding-right: 8px;
-}
-
-.tree-filter input {
-  width: 100%;
-  font-size: 12px;
-  padding: 3px 6px;
-}
-
-.tree-row[draggable='true'] {
-  cursor: default;
-}
-
-/* ─── Lot 5 : barre de menus et onglets façon SSMS ──────────────────────── */
-
-.topbar {
-  justify-content: flex-start;
-  gap: 14px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-}
-
-.topbar-right {
-  margin-left: auto;
-}
-
-.menubar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  position: relative;
-}
-
-/* Menu ouvert : les titres restent au-dessus du fond cliquable, pour passer
-   d'un menu à l'autre au survol. */
-.menubar.open {
-  z-index: 203;
-}
-
-/* Le fond cliquable du menu vit dans la barre : les titres passent devant. */
-.menubar.open .menubar-item {
-  position: relative;
-  z-index: 202;
-}
-
-.menubar-item {
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  padding: 4px 9px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.menubar-item:hover,
-.menubar-item.active {
-  background: var(--bg-hover);
-}
-
-.menubar-item.active {
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
-.ctx-menu.menubar-menu {
-  min-width: 260px;
-  max-width: 380px;
-  border-top-left-radius: 0;
-}
-
-.ctx-check {
-  display: inline-block;
-  width: 16px;
-  color: var(--accent);
-}
-
-.ctx-menu .ctx-item {
-  white-space: nowrap;
-}
-
-.tab-pin {
-  font-size: 10px;
-  margin-right: 4px;
-}
+/* ─── Dialogue « Enregistrer les modifications ? » ───────────────────────── */
 
 .save-changes-dialog {
   width: 440px;

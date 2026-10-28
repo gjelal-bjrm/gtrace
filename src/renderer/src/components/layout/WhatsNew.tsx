@@ -1,4 +1,5 @@
 import { useMemo, type JSX } from 'react'
+import { X } from 'lucide-react'
 import { LogoIcon } from './Logo'
 import { WHATS_NEW } from '../../data/whatsNew'
 import { useUpdateStore } from '../../stores/updateStore'
@@ -43,8 +44,8 @@ export default function WhatsNew({
               {version && <span className="whats-new-version"> — version {version}</span>}
             </span>
           </span>
-          <button className="btn btn-icon" onClick={onClose} title="Fermer">
-            ✕
+          <button className="modal-close" onClick={onClose} aria-label="Fermer" data-tip="Fermer">
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="modal-body whats-new-body">

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useEscapeClose } from '../../lib/useEscapeClose'
+import { Save } from 'lucide-react'
+import ModalHeader from '../ui/ModalHeader'
 
 export type SaveChoice = 'yes' | 'no' | 'cancel'
 
@@ -22,9 +24,7 @@ export default function SaveChangesDialog({
   return (
     <div className="modal-overlay">
       <div className="modal save-changes-dialog">
-        <div className="modal-header">
-          <h2>GTrace</h2>
-        </div>
+        <ModalHeader icon={Save} title="Enregistrer les modifications ?" />
         <div className="modal-body">
           <p>Voulez-vous enregistrer les modifications apportées aux éléments suivants ?</p>
           <ul className="save-changes-list">

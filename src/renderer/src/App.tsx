@@ -1,4 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ArrowDownToDot,
+  Bot,
+  Camera,
+  Check,
+  CircleDot,
+  CircleHelp,
+  CirclePause,
+  ClipboardPaste,
+  Copy,
+  Database,
+  Expand,
+  FilePlus,
+  FolderOpen,
+  Gauge,
+  Info,
+  LayoutTemplate,
+  LoaderCircle,
+  Maximize2,
+  MessageSquareCode,
+  MessageSquareOff,
+  MessageSquareText,
+  Minimize2,
+  Palette,
+  PanelBottom,
+  PanelLeft,
+  Play,
+  Plug,
+  Redo2,
+  RefreshCw,
+  Replace,
+  Save,
+  SaveAll,
+  ScanSearch,
+  Scissors,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  Table2,
+  TriangleAlert,
+  Undo2,
+  Variable,
+  X,
+  type LucideIcon
+} from 'lucide-react'
 import type {
   ConnectionRef,
   DatabaseInfo,
@@ -31,7 +77,11 @@ import TabBar from './components/editor/TabBar'
 import SaveChangesDialog, { type SaveChoice } from './components/editor/SaveChangesDialog'
 import { editorAction, editorPaste } from './components/editor/CodeEditor'
 import MenuBar, { type MenuDef } from './components/layout/MenuBar'
-import TreeMenu from './components/connections/TreeMenu'
+import QuickLaunch, { menuCommands } from './components/layout/QuickLaunch'
+import { StandardToolbar, SqlToolbar } from './components/layout/Toolbars'
+import MainStatusBar from './components/layout/MainStatusBar'
+import TooltipLayer from './components/ui/TooltipLayer'
+import TreeMenu, { type MenuItem } from './components/connections/TreeMenu'
 import { copyText } from './lib/clipboard'
 import Breadcrumb from './components/editor/Breadcrumb'
 import { breadcrumbFor, deadRanges, executedStatements, lastExecutedUse } from './lib/executionPath'
@@ -40,9 +90,9 @@ import { buildMessages } from './lib/messages'
 import { mapArgsToParams, parseProcCall } from './lib/procCall'
 import { isolateProcedureBatch } from './lib/sqlBatches'
 import Splitter from './components/layout/Splitter'
-import { Wordmark } from './components/layout/Logo'
+import { LogoIcon } from './components/layout/Logo'
 import UpdateBanner from './components/layout/UpdateBanner'
-import StatusBar from './components/layout/StatusBar'
+import QueryStatusBar from './components/layout/QueryStatusBar'
 import ThemeDialog from './components/layout/ThemeDialog'
 import HelpDialog from './components/layout/HelpDialog'
 import { useAppearanceStore } from './stores/appearanceStore'
@@ -52,6 +102,18 @@ import { setCompletionSchema } from './components/editor/completion'
 import { useReplayStore } from './stores/replayStore'
 
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
+/** Barres d'outils affichées (Affichage › Barres d'outils), mémorisées. */
+interface ToolbarsVisibility {
+  standard: boolean
+  sql: boolean
+}
+function loadToolbars(): ToolbarsVisibility {
+  try {
+    return { standard: true, sql: true, ...JSON.parse(localStorage.getItem('gtrace.toolbars') ?? '{}') }
+  } catch {
+    return { standard: true, sql: true }
+  }
+}
 function loadSize(key: string, def: number, min: number, max: number): number {
   const v = Number(localStorage.getItem(key))
   // Reborne à la lecture : une valeur héritée trop petite/grande est corrigée
@@ -143,8 +205,14 @@ export default function App(): JSX.Element {
   const [status, setStatus] = useState<SidecarStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<Tab>('run')
+  // Comme SSMS, le volet s'ouvre sur les Résultats.
+  const [tab, setTab] = useState<Tab>('results')
   /** Fin de la dernière exécution (ligne « Heure de fin » des Messages). */
   const [runFinishedAt, setRunFinishedAt] = useState<Date | null>(null)
   /** Début de la dernière exécution (chronomètre de la barre d'état). */
@@ -168,6 +236,10 @@ export default function App(): JSX.Element {
   /** Ctrl+R : volet de résultats masqué (l'éditeur prend toute la hauteur). */
   const [resultsHidden, setResultsHidden] = useState(false)
   const [showExplorer, setShowExplorer] = useState(true)
+  const [toolbars, setToolbars] = useState<ToolbarsVisibility>(loadToolbars)
+  useEffect(() => {
+    localStorage.setItem('gtrace.toolbars', JSON.stringify(toolbars))
+  }, [toolbars])
   const [showConnect, setShowConnect] = useState(false)
   /** Résultats agrandis : masque l'éditeur pour donner toute la place aux données. */
   const [focusMode, setFocusMode] = useState(false)
@@ -203,6 +275,9 @@ export default function App(): JSX.Element {
     localStorage.setItem('gtrace.timelineH', String(timelineHeight))
   }, [timelineHeight])
   const [session, setSession] = useState<SessionState | null>(null)
+  // Lu par les raccourcis clavier (F5 = Continuer, F10 = Pas à pas pendant une pause).
+  const sessionRef = useRef(session)
+  sessionRef.current = session
   /** Timeout de sécurité des sessions breakpoint (minutes). */
   const timeoutMin = 10
   const [xe, setXe] = useState<XeState | null>(null)
@@ -658,6 +733,14 @@ export default function App(): JSX.Element {
   // Navigation clavier replay : F10 / Shift+F10 / Ctrl+← / Ctrl+→
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
+      const live = sessionRef.current
+      if (e.key === 'F10' && !e.shiftKey && live?.status === 'paused') {
+        // Session en pause : F10 exécute l'instruction suivante (comme un débogueur).
+        e.preventDefault()
+        e.stopPropagation()
+        void window.gtrace.debugStepOnce(live.id)
+        return
+      }
       const store = useReplayStore.getState()
       if (!store.run) return
       if (e.key === 'F10') {
@@ -762,6 +845,24 @@ export default function App(): JSX.Element {
     }
   }, [locked, activeConn, tabDatabase, resetDerived])
 
+  /** Enregistre tous les onglets modifiés (demande où pour les nouveaux), comme SSMS. */
+  const doSaveAll = useCallback(async () => {
+    let saved = 0
+    for (const t of useEditorStore.getState().tabs.filter((x) => x.dirty)) {
+      try {
+        const res = await window.gtrace.saveFile(t.filePath, t.content, t.title)
+        if (res) {
+          useEditorStore.getState().markSaved(t.id, res.path, res.name)
+          saved += 1
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      }
+    }
+    setNotice(saved > 0 ? `${saved} fichier(s) enregistré(s).` : 'Aucune modification à enregistrer.')
+  }, [])
+
   const doSave = useCallback(async (saveAs = false) => {
     const st = useEditorStore.getState()
     const t = st.tabs.find((x) => x.id === st.activeId) ?? st.tabs[0]
@@ -827,14 +928,24 @@ export default function App(): JSX.Element {
   /** Clic droit sur un onglet. */
   const [tabMenu, setTabMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
-  // Raccourcis fichier : Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Maj+S / Ctrl+W
+  // Raccourcis fichier : Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Maj+S / Ctrl+W / Ctrl+Tab
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (!e.ctrlKey && !e.metaKey) return
       const k = e.key.toLowerCase()
       if (k === 's') {
+        // Ctrl+Maj+S = Enregistrer tout, comme SSMS.
         e.preventDefault()
-        void doSave(e.shiftKey)
+        if (e.shiftKey) void doSaveAll()
+        else void doSave(false)
+      } else if (e.key === 'Tab') {
+        // Ctrl+Tab / Ctrl+Maj+Tab : onglet suivant / précédent.
+        e.preventDefault()
+        e.stopPropagation()
+        const st = useEditorStore.getState()
+        const i = st.tabs.findIndex((t) => t.id === st.activeId)
+        const next = st.tabs[(i + (e.shiftKey ? -1 : 1) + st.tabs.length) % st.tabs.length]
+        if (next) switchToTab(next.id)
       } else if (k === 'o') {
         e.preventDefault()
         void doOpen()
@@ -849,7 +960,7 @@ export default function App(): JSX.Element {
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [doSave, doOpen, doNew, doCloseTab])
+  }, [doSave, doSaveAll, doOpen, doNew, doCloseTab, switchToTab])
 
   // ─── Connexions ────────────────────────────────────────────────────────────
   const onConnected = useCallback(
@@ -1056,7 +1167,10 @@ export default function App(): JSX.Element {
 
   const execute = useCallback(async () => {
     if (!activeRef) {
-      setError('Aucune connexion active : cliquez « Connecter » pour choisir un serveur.')
+      // Comme SSMS : exécuter un onglet non connecté ouvre le dialogue de
+      // connexion, puis la requête part d'elle-même une fois connecté.
+      setPendingRun(useEditorStore.getState().activeId)
+      setShowConnect(true)
       return
     }
     if (!confirmProduction()) return
@@ -1235,21 +1349,26 @@ export default function App(): JSX.Element {
         (e.key === 'F5' && !e.shiftKey && !e.altKey) ||
         (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'Enter' || k === 'e'))
       ) {
-        // F5 / Ctrl+E (SSMS) / Ctrl+Entrée : exécuter.
+        // F5 / Ctrl+E (SSMS) / Ctrl+Entrée : exécuter ; pendant une pause, continuer.
         e.preventDefault()
         e.stopPropagation()
-        if (!busy && !locked) void execute()
+        if (session?.status === 'paused') void window.gtrace.debugContinue(session.id)
+        else if (!busy && !locked) void execute()
       } else if (e.key === 'Pause' || e.key === 'Cancel') {
         // Alt+Pause (SSMS) : arrêter la session de débogage ou le profilage.
         e.preventDefault()
         if (session) void window.gtrace.debugStop(session.id)
         else if (xe) void window.gtrace.xeStop(xe.id)
       } else if (e.key === 'F1') {
+        // stopPropagation : l'éditeur ouvrirait sinon aussi sa propre palette (F1).
         e.preventDefault()
+        e.stopPropagation()
         setShowHelp(true)
       } else if (e.key === 'F8' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-        // F8 (SSMS) : afficher / masquer l'explorateur d'objets.
+        // F8 (SSMS) : afficher / masquer l'explorateur d'objets (l'éditeur, lui,
+        // y verrait « erreur suivante »).
         e.preventDefault()
+        e.stopPropagation()
         setShowExplorer((v) => !v)
       }
     }
@@ -1277,6 +1396,25 @@ export default function App(): JSX.Element {
     const next = cur.includes(line) ? cur.filter((l) => l !== line) : [...cur, line]
     st.patchActive({ breakpoints: next })
   }, [])
+
+  // F9 : poser / retirer un point d'arrêt sur la ligne du curseur.
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const toggleBreakpointAtCursor = useCallback(() => {
+    const line = cursorRef.current?.line
+    if (line) toggleBreakpoint(line)
+  }, [toggleBreakpoint])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'F9' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        toggleBreakpointAtCursor()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [toggleBreakpointAtCursor])
 
   /**
    * L'utilisateur a lancé « ma_procedure 1374 » : on va chercher le corps de la
@@ -1441,6 +1579,8 @@ export default function App(): JSX.Element {
       : (run?.steps[currentStep]?.startLine ?? null))
 
   const canRun = activeRef !== null && !busy && !locked
+  /** Exécuter reste disponible sans connexion : il propose alors de se connecter (SSMS). */
+  const canExecute = !busy && !locked
 
   /** Branches jamais atteintes, repliables à la demande (procédures longues). */
   const hiddenRanges = useMemo(
@@ -1464,16 +1604,57 @@ export default function App(): JSX.Element {
     else void document.documentElement.requestFullscreen()
   }
 
+  /** Fenêtre › Rétablir la disposition : tailles et panneaux d'origine. */
+  const resetLayout = (): void => {
+    setExplorerWidth(288)
+    setResultsHeight(300)
+    setTimelineHeight(132)
+    setShowExplorer(true)
+    setResultsHidden(false)
+    setFocusMode(false)
+    setToolbars({ standard: true, sql: true })
+  }
+
+  const paused = session?.status === 'paused'
+  const running = busy || session?.status === 'running' || xe !== null
+  const stopAll = (): void => {
+    if (session) void window.gtrace.debugStop(session.id)
+    else if (xe) void window.gtrace.xeStop(xe.id)
+  }
+  const continueSession = (): void => {
+    if (session) void window.gtrace.debugContinue(session.id)
+  }
+  const stepSession = (): void => {
+    if (session) void window.gtrace.debugStepOnce(session.id)
+  }
+  const runLabel = paused
+    ? 'Continuer'
+    : running
+      ? 'Exécution…'
+      : breakpoints.size > 0
+        ? `Déboguer (${breakpoints.size})`
+        : selectionLines > 0
+          ? 'Exécuter la sélection'
+          : 'Exécuter'
+  const runTip = paused
+    ? "Continuer jusqu'au prochain point d'arrêt"
+    : breakpoints.size > 0
+      ? `Exécuter pas à pas en s'arrêtant sur ${breakpoints.size} point(s) d'arrêt`
+      : selectionLines > 0
+        ? 'Exécuter uniquement le texte sélectionné'
+        : "Exécuter tout l'onglet — sélectionnez du texte pour n'exécuter que celui-ci"
+
   /** Barre de menus façon SSMS : chaque commande à un seul endroit prévisible. */
   const menus: MenuDef[] = [
     {
       label: 'Fichier',
       items: [
-        { label: 'Nouvelle requête', shortcut: 'Ctrl+N', disabled: locked, onClick: doNew },
-        { label: 'Ouvrir…', shortcut: 'Ctrl+O', disabled: locked, onClick: () => void doOpen() },
+        { label: 'Nouvelle requête', icon: FilePlus, shortcut: 'Ctrl+N', disabled: locked, onClick: doNew },
+        { label: 'Ouvrir…', icon: FolderOpen, shortcut: 'Ctrl+O', disabled: locked, onClick: () => void doOpen() },
         'sep',
-        { label: `Enregistrer ${activeTab.title}`, shortcut: 'Ctrl+S', onClick: () => void doSave(false) },
-        { label: `Enregistrer ${activeTab.title} sous…`, shortcut: 'Ctrl+Maj+S', onClick: () => void doSave(true) },
+        { label: `Enregistrer ${activeTab.title}`, icon: Save, shortcut: 'Ctrl+S', onClick: () => void doSave(false) },
+        { label: `Enregistrer ${activeTab.title} sous…`, onClick: () => void doSave(true) },
+        { label: 'Enregistrer tout', icon: SaveAll, shortcut: 'Ctrl+Maj+S', onClick: () => void doSaveAll() },
         'sep',
         { label: 'Fermer', shortcut: 'Ctrl+W', disabled: locked, onClick: () => doCloseTab(activeId) },
         { label: 'Fermer tous les documents', disabled: locked, onClick: () => void closeTabs(tabs.map((t) => t.id)) },
@@ -1484,20 +1665,20 @@ export default function App(): JSX.Element {
     {
       label: 'Édition',
       items: [
-        { label: 'Annuler', shortcut: 'Ctrl+Z', onClick: () => editorAction('undo') },
-        { label: 'Rétablir', shortcut: 'Ctrl+Y', onClick: () => editorAction('redo') },
+        { label: 'Annuler', icon: Undo2, shortcut: 'Ctrl+Z', onClick: () => editorAction('undo') },
+        { label: 'Rétablir', icon: Redo2, shortcut: 'Ctrl+Y', onClick: () => editorAction('redo') },
         'sep',
-        { label: 'Couper', shortcut: 'Ctrl+X', onClick: () => editorAction('editor.action.clipboardCutAction') },
-        { label: 'Copier', shortcut: 'Ctrl+C', onClick: () => editorAction('editor.action.clipboardCopyAction') },
-        { label: 'Coller', shortcut: 'Ctrl+V', onClick: () => void editorPaste() },
+        { label: 'Couper', icon: Scissors, shortcut: 'Ctrl+X', onClick: () => editorAction('editor.action.clipboardCutAction') },
+        { label: 'Copier', icon: Copy, shortcut: 'Ctrl+C', onClick: () => editorAction('editor.action.clipboardCopyAction') },
+        { label: 'Coller', icon: ClipboardPaste, shortcut: 'Ctrl+V', onClick: () => void editorPaste() },
         { label: 'Sélectionner tout', shortcut: 'Ctrl+A', onClick: () => editorAction('editor.action.selectAll') },
         'sep',
-        { label: 'Rechercher', shortcut: 'Ctrl+F', onClick: () => editorAction('actions.find') },
-        { label: 'Remplacer', shortcut: 'Ctrl+H', onClick: () => editorAction('editor.action.startFindReplaceAction') },
+        { label: 'Rechercher', icon: Search, shortcut: 'Ctrl+F', onClick: () => editorAction('actions.find') },
+        { label: 'Remplacer', icon: Replace, shortcut: 'Ctrl+H', onClick: () => editorAction('editor.action.startFindReplaceAction') },
         { label: 'Atteindre la ligne…', shortcut: 'Ctrl+G', onClick: () => editorAction('editor.action.gotoLine') },
         'sep',
-        { label: 'Commenter les lignes', shortcut: 'Ctrl+K, Ctrl+C', onClick: () => editorAction('editor.action.addCommentLine') },
-        { label: 'Décommenter les lignes', shortcut: 'Ctrl+K, Ctrl+U', onClick: () => editorAction('editor.action.removeCommentLine') },
+        { label: 'Commenter les lignes', icon: MessageSquareCode, shortcut: 'Ctrl+K, Ctrl+C', onClick: () => editorAction('editor.action.addCommentLine') },
+        { label: 'Décommenter les lignes', icon: MessageSquareOff, shortcut: 'Ctrl+K, Ctrl+U', onClick: () => editorAction('editor.action.removeCommentLine') },
         { label: 'Mettre en majuscules', shortcut: 'Ctrl+Maj+U', onClick: () => editorAction('editor.action.transformToUppercase') },
         { label: 'Mettre en minuscules', shortcut: 'Ctrl+Maj+L', onClick: () => editorAction('editor.action.transformToLowercase') }
       ]
@@ -1505,40 +1686,44 @@ export default function App(): JSX.Element {
     {
       label: 'Affichage',
       items: [
-        { label: "Explorateur d'objets", shortcut: 'F8', checked: showExplorer, onClick: () => setShowExplorer((v) => !v) },
-        { label: 'Volet de résultats', shortcut: 'Ctrl+R', checked: !resultsHidden, onClick: () => setResultsHidden((h) => !h) },
-        { label: 'Agrandir les résultats', checked: focusMode, onClick: () => setFocusMode((f) => !f) },
+        { label: "Explorateur d'objets", icon: PanelLeft, shortcut: 'F8', checked: showExplorer, onClick: () => setShowExplorer((v) => !v) },
+        { label: 'Volet de résultats', icon: PanelBottom, shortcut: 'Ctrl+R', checked: !resultsHidden, onClick: () => setResultsHidden((h) => !h) },
+        { label: 'Agrandir les résultats', icon: Maximize2, checked: focusMode, onClick: () => setFocusMode((f) => !f) },
+        {
+          label: "Barres d'outils",
+          children: [
+            { label: 'Standard', checked: toolbars.standard, onClick: () => setToolbars((t) => ({ ...t, standard: !t.standard })) },
+            { label: 'Éditeur SQL', checked: toolbars.sql, onClick: () => setToolbars((t) => ({ ...t, sql: !t.sql })) }
+          ]
+        },
         'sep',
-        { label: 'Plein écran', shortcut: 'F11', onClick: toggleFullScreen },
-        { label: 'Apparence…', onClick: () => setShowTheme(true) }
+        { label: 'Plein écran', icon: Expand, shortcut: 'F11', onClick: toggleFullScreen },
+        { label: 'Apparence…', icon: Palette, onClick: () => setShowTheme(true) }
       ]
     },
     {
       label: 'Requête',
       items: [
         {
-          label: breakpoints.size > 0 ? `Déboguer (${breakpoints.size} point(s) d'arrêt)` : selectionLines > 0 ? 'Exécuter la sélection' : 'Exécuter',
+          label: paused ? 'Continuer' : breakpoints.size > 0 ? `Déboguer (${breakpoints.size} point(s) d'arrêt)` : selectionLines > 0 ? 'Exécuter la sélection' : 'Exécuter',
+          icon: Play,
           shortcut: 'F5',
           bold: true,
-          disabled: !canRun,
-          onClick: () => void execute()
+          disabled: paused ? false : !canExecute,
+          onClick: paused ? continueSession : () => void execute()
         },
-        { label: 'Analyser', shortcut: 'Ctrl+F5', disabled: busy || locked, onClick: () => void analyze() },
-        { label: 'Profiler (temps par ligne)', disabled: !canRun, onClick: () => void startProfiling() },
-        {
-          label: 'Arrêter',
-          shortcut: 'Alt+Pause',
-          disabled: !session && !xe,
-          onClick: () => {
-            if (session) void window.gtrace.debugStop(session.id)
-            else if (xe) void window.gtrace.xeStop(xe.id)
-          }
-        },
+        { label: 'Arrêter', icon: Square, shortcut: 'Alt+Pause', disabled: !session && !xe, onClick: stopAll },
+        { label: 'Analyser', icon: Check, shortcut: 'Ctrl+F5', disabled: busy || locked, onClick: () => void analyze() },
+        { label: 'Profiler (temps par ligne)', icon: Gauge, disabled: !canRun, onClick: () => void startProfiling() },
+        'sep',
+        { label: 'Pas à pas', icon: ArrowDownToDot, shortcut: 'F10', disabled: !paused, onClick: stepSession },
+        { label: "Poser / retirer un point d'arrêt", icon: CircleDot, shortcut: 'F9', onClick: toggleBreakpointAtCursor },
         'sep',
         {
           label: 'Connexion',
+          icon: Plug,
           children: [
-            { label: 'Connecter…', onClick: () => setShowConnect(true) },
+            { label: 'Connecter…', icon: Plug, onClick: () => setShowConnect(true) },
             {
               label: "Déconnecter l'onglet",
               disabled: !activeConn || locked,
@@ -1546,30 +1731,48 @@ export default function App(): JSX.Element {
             }
           ]
         },
-        { label: 'Changer de base', shortcut: 'Ctrl+U', disabled: !activeConn || locked, onClick: () => dbPickerRef.current?.focus() }
+        { label: 'Changer de base', icon: Database, shortcut: 'Ctrl+U', disabled: !activeConn || locked, onClick: () => dbPickerRef.current?.focus() }
       ]
     },
     {
       label: 'Outils',
       items: [
-        { label: 'Accès IA / MCP…', onClick: () => setShowAiActivity(true) },
-        { label: 'Diagnostic IA de la dernière exécution…', disabled: !run, onClick: () => setShowDiagnosis(true) },
+        { label: 'Accès IA / MCP…', icon: Bot, onClick: () => setShowAiActivity(true) },
+        { label: 'Diagnostic IA de la dernière exécution…', icon: Sparkles, disabled: !run, onClick: () => setShowDiagnosis(true) },
         'sep',
-        { label: 'Apparence (thèmes, taille du texte)…', onClick: () => setShowTheme(true) },
-        { label: 'Rechercher les mises à jour', onClick: () => useUpdateStore.getState().check() }
+        { label: 'Apparence (thèmes, taille du texte)…', icon: Palette, onClick: () => setShowTheme(true) },
+        { label: 'Rechercher les mises à jour', icon: RefreshCw, onClick: () => useUpdateStore.getState().check() }
+      ]
+    },
+    {
+      label: 'Fenêtre',
+      items: [
+        { label: 'Rétablir la disposition de fenêtre', icon: LayoutTemplate, onClick: resetLayout },
+        { label: 'Masquer le volet de résultats', shortcut: 'Ctrl+R', checked: resultsHidden, onClick: () => setResultsHidden((h) => !h) },
+        { label: 'Fermer tous les documents', disabled: locked, onClick: () => void closeTabs(tabs.map((t) => t.id)) },
+        'sep',
+        ...tabs.slice(0, 9).map(
+          (t, i): MenuItem => ({
+            label: `${i + 1}  ${t.title}${t.dirty ? '*' : ''}`,
+            checked: t.id === activeId,
+            disabled: locked && t.id !== activeId,
+            onClick: () => switchToTab(t.id)
+          })
+        )
       ]
     },
     {
       label: 'Aide',
       items: [
-        { label: 'Aide de GTrace', shortcut: 'F1', onClick: () => setShowHelp(true) },
-        { label: 'Nouveautés', onClick: () => setWhatsNewSince('') },
+        { label: 'Aide de GTrace', icon: CircleHelp, shortcut: 'F1', onClick: () => setShowHelp(true) },
+        { label: 'Nouveautés', icon: Sparkles, onClick: () => setWhatsNewSince('') },
         'sep',
         {
           label: 'À propos de GTrace',
+          icon: Info,
           onClick: () =>
             setNotice(
-              `GTrace v${appVersion || '?'} — moteur d'analyse ${status?.running ? `ScriptDom ${status.version ?? '?'}` : 'inactif'}`
+              `GTrace ${appVersion || '?'} — moteur d'analyse ${status?.running ? `ScriptDom ${status.version ?? '?'}` : 'inactif'}`
             )
         }
       ]
@@ -1578,31 +1781,100 @@ export default function App(): JSX.Element {
 
   const menuTab = tabMenu ? tabs.find((t) => t.id === tabMenu.id) : undefined
 
+  /** Onglet du volet de résultats : petit, aligné à gauche, comme SSMS. */
+  const resultTab = (
+    id: Tab,
+    Icon: LucideIcon,
+    label: string,
+    tip: string,
+    count?: number,
+    tone?: 'error'
+  ): JSX.Element => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={tab === id}
+      className={`result-tab${tab === id ? ' active' : ''}${id === 'results' || id === 'messages' ? '' : ' ext'}`}
+      onClick={() => setTab(id)}
+      data-tip={tip}
+    >
+      <Icon size={14} strokeWidth={1.8} aria-hidden="true" />
+      <span className="result-label">{label}</span>
+      {count !== undefined && count > 0 && <span className={`result-count${tone ? ` ${tone}` : ''}`}>{count}</span>}
+    </button>
+  )
+
   return (
     <div className="app">
-      <header className="topbar">
-        <span className="brand">
-          <Wordmark />
+      <TooltipLayer />
+
+      {/* ─── Barre de menus + Rechercher une commande (Lancement rapide) ─── */}
+      <header className="menubar-row">
+        <span className="app-logo" data-tip="GTrace — débogueur T-SQL time-travel">
+          <LogoIcon size={18} />
         </span>
         <MenuBar menus={menus} />
-        <span className="topbar-right">
-          <span
-            className={`sidecar-status ${status?.running ? 'ok' : 'ko'}`}
-            title={status?.running ? `Moteur d'analyse ScriptDom ${status.version ?? ''}` : "Moteur d'analyse inactif"}
-          />
-          <button
-            className="btn btn-ghost app-version"
-            onClick={() => setWhatsNewSince('')}
-            title="Voir les nouveautés"
-          >
-            v{appVersion || '…'}
-          </button>
-        </span>
+        <span className="menubar-spacer" />
+        <QuickLaunch commands={menuCommands(menus)} />
       </header>
+
+      {/* ─── Barres d'outils (les deux rangées de SSMS) ─────────────────── */}
+      {toolbars.standard && (
+        <StandardToolbar
+          locked={locked}
+          onOpen={() => void doOpen()}
+          onSave={() => void doSave(false)}
+          onSaveAll={() => void doSaveAll()}
+          onNew={doNew}
+          explorerVisible={showExplorer}
+          onToggleExplorer={() => setShowExplorer((v) => !v)}
+          resultsVisible={!resultsHidden}
+          onToggleResults={() => setResultsHidden((h) => !h)}
+          onAppearance={() => setShowTheme(true)}
+          onHelp={() => setShowHelp(true)}
+        />
+      )}
+      {toolbars.sql && (
+        <SqlToolbar
+          connections={connections}
+          activeConn={activeConn}
+          locked={locked}
+          onConnect={() => setShowConnect(true)}
+          onPickConnection={pickConnection}
+          onDetach={() => pickConnection('')}
+          databases={activeDatabases}
+          database={activeConn ? (tabDatabase ?? activeConn.defaultDatabase) : null}
+          onPickDatabase={pickDatabase}
+          dbPickerRef={dbPickerRef}
+          runLabel={runLabel}
+          runTip={runTip}
+          canRun={paused || canExecute}
+          running={running && !paused}
+          onRun={paused ? continueSession : () => void execute()}
+          canStop={session !== null || xe !== null}
+          onStop={stopAll}
+          onAnalyze={() => void analyze()}
+          canStep={paused}
+          onStep={stepSession}
+          onToggleBreakpoint={toggleBreakpointAtCursor}
+          canProfile={canRun}
+          onProfile={() => void startProfiling()}
+          readOnly={readOnly}
+          compatLevel={compatLevel}
+          onCompat={setCompatLevel}
+        />
+      )}
       <UpdateBanner />
 
       {showConnect && (
-        <ConnectDialog onConnected={onConnected} onClose={() => setShowConnect(false)} />
+        <ConnectDialog
+          onConnected={onConnected}
+          onClose={() => {
+            setShowConnect(false)
+            // Dialogue annulé : l'exécution en attente est abandonnée.
+            if (!useEditorStore.getState().active().connectionId) setPendingRun(null)
+          }}
+        />
       )}
       {whatsNewSince !== null && (
         <WhatsNew since={whatsNewSince} onClose={() => setWhatsNewSince(null)} />
@@ -1625,6 +1897,7 @@ export default function App(): JSX.Element {
           items={[
             {
               label: `Enregistrer ${menuTab.title}`,
+              icon: Save,
               shortcut: 'Ctrl+S',
               onClick: () => {
                 switchToTab(menuTab.id)
@@ -1646,11 +1919,13 @@ export default function App(): JSX.Element {
             'sep',
             {
               label: "Copier le chemin d'accès complet",
+              icon: Copy,
               disabled: !menuTab.filePath,
               onClick: () => void copyText(menuTab.filePath ?? '').then(() => setNotice('Chemin copié.'))
             },
             {
               label: 'Ouvrir le dossier contenant',
+              icon: FolderOpen,
               disabled: !menuTab.filePath,
               onClick: () => menuTab.filePath && void window.gtrace.revealFile(menuTab.filePath)
             },
@@ -1674,184 +1949,18 @@ export default function App(): JSX.Element {
         />
       )}
 
-      {/* ─── Barre d'outils ─────────────────────────────────────────────── */}
-      <div className="toolbar">
-        <div className="toolbar-group">
-          <select
-            className="conn-picker"
-            value={activeTab.connectionId ?? ''}
-            disabled={locked}
-            onChange={(e) => pickConnection(e.target.value)}
-            title="Connexion de l'onglet actif"
-          >
-            <option value="">(non connecté)</option>
-            {connections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.production ? '⚠ ' : ''}
-                {c.label}
-              </option>
-            ))}
-          </select>
-          {/* Pas de bouton « Connecter » ici : il vit dans l'en-tête de
-              l'explorateur d'objets, à un seul endroit. */}
-          <select
-            ref={dbPickerRef}
-            className="db-picker"
-            value={activeConn ? (tabDatabase ?? activeConn.defaultDatabase) : ''}
-            disabled={!activeConn || locked}
-            onChange={(e) => pickDatabase(e.target.value)}
-            title="Bases de données disponibles (Ctrl+U)"
-          >
-            {!activeConn && <option value="">—</option>}
-            {/* La base courante figure toujours, même avant le chargement de la liste. */}
-            {activeConn &&
-              !activeDatabases?.some((d) => d.name === (tabDatabase ?? activeConn.defaultDatabase)) && (
-                <option value={tabDatabase ?? activeConn.defaultDatabase}>
-                  {tabDatabase ?? activeConn.defaultDatabase}
-                </option>
-              )}
-            {activeDatabases
-              ?.filter((d) => d.online)
-              .map((d) => (
-                <option key={d.name} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
-          </select>
-          {activeConn?.production && <span className="prod-badge">⚠ PROD</span>}
-          {readOnly && <span className="ro-badge">🔒 lecture seule</span>}
-        </div>
-
-        <span className="spacer" />
-
-        {session ? (
-          <div className="toolbar-group">
-            <button
-              className="btn btn-primary"
-              onClick={() => void window.gtrace.debugContinue(session.id)}
-              disabled={session.status !== 'paused'}
-              title="Continuer jusqu'au prochain breakpoint"
-            >
-              ⏵ Continuer
-            </button>
-            <button
-              className="btn"
-              onClick={() => void window.gtrace.debugStepOnce(session.id)}
-              disabled={session.status !== 'paused'}
-              title="Exécuter un statement (pas à pas)"
-            >
-              ⤵ Step
-            </button>
-            <button
-              className="btn btn-danger"
-              onClick={() => void window.gtrace.debugStop(session.id)}
-              title="Annuler l'exécution et rollbacker"
-            >
-              ⏹ Stop
-            </button>
-          </div>
-        ) : (
-          <div className="toolbar-group">
-            <select
-              className="compat-select"
-              value={compatLevel}
-              onChange={(e) => setCompatLevel(Number(e.target.value))}
-              title="Niveau de compatibilité (parsing)"
-            >
-              <option value={160}>SQL 2022</option>
-              <option value={150}>SQL 2019</option>
-              <option value={140}>SQL 2017</option>
-              <option value={130}>SQL 2016</option>
-            </select>
-            <button
-              className="btn"
-              onClick={analyze}
-              disabled={busy}
-              title="Vérifie la syntaxe et liste les statements et paramètres — SANS rien exécuter sur le serveur."
-            >
-              {busy ? '…' : '🔍 Analyser'}
-            </button>
-            {xe ? (
-              <button className="btn btn-danger" onClick={() => void window.gtrace.xeStop(xe.id)}>
-                ⏹ Stop profil
-              </button>
-            ) : (
-              <button
-                className="btn"
-                onClick={startProfiling}
-                disabled={!canRun}
-                title="Exécute tel quel et mesure le temps passé sur chaque ligne, pour trouver les lenteurs (Extended Events, sans instrumentation)."
-              >
-                ⚡ Profiler
-              </button>
-            )}
-            <button
-              className="btn btn-primary btn-run"
-              onClick={execute}
-              disabled={!canRun}
-              title={
-                breakpoints.size > 0
-                  ? `Exécute pas à pas en s'arrêtant sur ${breakpoints.size} breakpoint(s) (F5)`
-                  : selectionLines > 0
-                    ? 'Exécute UNIQUEMENT le texte sélectionné (F5)'
-                    : "Exécute tout le contenu de l'onglet (F5). Sélectionnez du texte pour n'exécuter que celui-ci."
-              }
-            >
-              {busy
-                ? 'Exécution…'
-                : breakpoints.size > 0
-                  ? `▶ Déboguer (${breakpoints.size})`
-                  : selectionLines > 0
-                    ? '▶ Exécuter la sélection'
-                    : '▶ Exécuter'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {xe && (
-        <div className="session-banner running">
-          ⚡ Profilage XEvents en cours — {xe.statements} statement(s)
-          {xe.currentLine ? ` — ligne courante ${xe.currentLine}` : ''}
-        </div>
-      )}
-      {session && (
-        <div className={`session-banner ${session.status}`}>
-          {session.status === 'paused' && session.paused ? (
-            <>
-              ⏸ En pause avant la ligne {session.paused.startLine} — TRANCOUNT{' '}
-              {session.paused.tranCount}
-              {session.paused.isolationLevel ? ` — ${session.paused.isolationLevel}` : ''}
-              {session.paused.lockCount !== null ? ` — ${session.paused.lockCount} lock(s)` : ''}
-              {session.paused.tranCount > 0 &&
-                ' — ⚠ transaction ouverte : une inspection depuis une autre connexion peut être bloquée (onglet Inspect → READ UNCOMMITTED)'}
-            </>
-          ) : (
-            <>▶ Exécution en cours… (F10 indisponible tant que la session tourne)</>
-          )}
-        </div>
-      )}
-      {error && (
-        <div className="error-toast" onClick={() => setError(null)} title="Cliquer pour masquer">
-          {error}
-        </div>
-      )}
-      {notice && !error && (
-        <div className="notice-toast" onClick={() => setNotice(null)}>
-          {notice}
-        </div>
-      )}
-
       <main className="workspace">
+        {/* ─── Panneaux ancrés à gauche (Explorateur d'objets, comme SSMS) ── */}
         {showExplorer && (
           <>
-            <aside className="explorer-pane" style={{ width: explorerWidth }}>
+            <aside className="dock-left" style={{ width: explorerWidth }}>
               <ObjectExplorer
                 onOpenScript={onOpenScript}
                 onConnect={() => setShowConnect(true)}
                 onDisconnect={onDisconnect}
                 onNewQuery={onNewQuery}
                 onNotice={setNotice}
+                onHide={() => setShowExplorer(false)}
                 locked={locked}
               />
               <HistoryPanel
@@ -1867,23 +1976,78 @@ export default function App(): JSX.Element {
           </>
         )}
 
-        {/* Colonne principale, disposition SSMS : éditeur en haut, résultats en
-            bas sur toute la largeur (tables larges lisibles sans scroll latéral). */}
-        <section className="main-area">
+        {/* ─── Zone des documents : onglets, éditeur, résultats, barre de requête ── */}
+        <section className="document-area">
+          <TabBar
+            locked={locked}
+            onSwitch={switchToTab}
+            runningTabId={running ? activeId : null}
+            onClose={doCloseTab}
+            onTabMenu={(id, x, y) => setTabMenu({ id, x, y })}
+          />
+          <div className={`busy-bar${running && !paused ? ' active' : ''}`} aria-hidden="true" />
+
+          {/* Bandeau d'information (débogage en pause, exécution, profilage). */}
+          {xe && (
+            <div className="infobar running">
+              <Gauge size={15} aria-hidden="true" />
+              <span className="infobar-text">
+                Profilage en cours — {xe.statements} instruction(s)
+                {xe.currentLine ? ` — ligne ${xe.currentLine}` : ''}
+              </span>
+              <button type="button" className="btn btn-sm btn-danger" onClick={stopAll}>
+                <Square size={12} aria-hidden="true" /> Arrêter le profil
+              </button>
+            </div>
+          )}
+          {session && (
+            <div className={`infobar ${session.status}`}>
+              {session.status === 'paused' && session.paused ? (
+                <>
+                  <CirclePause size={15} aria-hidden="true" />
+                  <span className="infobar-text">
+                    En pause avant la ligne <strong>{session.paused.startLine}</strong>
+                    <span className="infobar-meta">
+                      TRANCOUNT {session.paused.tranCount}
+                      {session.paused.isolationLevel ? ` · ${session.paused.isolationLevel}` : ''}
+                      {session.paused.lockCount !== null ? ` · ${session.paused.lockCount} verrou(s)` : ''}
+                    </span>
+                    {session.paused.tranCount > 0 && (
+                      <span className="infobar-warn">
+                        <TriangleAlert size={13} aria-hidden="true" /> transaction ouverte : une
+                        inspection depuis une autre connexion peut être bloquée (Inspect → READ UNCOMMITTED)
+                      </span>
+                    )}
+                  </span>
+                  <span className="infobar-actions">
+                    <button type="button" className="btn btn-sm btn-run" onClick={continueSession} data-tip="Continuer" data-shortcut="F5">
+                      <Play size={12} fill="currentColor" aria-hidden="true" /> Continuer
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={stepSession} data-tip="Pas à pas" data-shortcut="F10">
+                      <ArrowDownToDot size={13} aria-hidden="true" /> Pas à pas
+                    </button>
+                    <button type="button" className="btn btn-sm btn-danger" onClick={stopAll} data-tip="Arrêter et annuler (rollback)" data-shortcut="Alt+Pause">
+                      <Square size={12} aria-hidden="true" /> Arrêter
+                    </button>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <LoaderCircle size={15} className="spin" aria-hidden="true" />
+                  <span className="infobar-text">Exécution en cours… elle s&apos;arrêtera au prochain point d&apos;arrêt.</span>
+                  <span className="infobar-actions">
+                    <button type="button" className="btn btn-sm btn-danger" onClick={stopAll}>
+                      <Square size={12} aria-hidden="true" /> Arrêter
+                    </button>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           {!focusMode && (
             <>
               <section className="editor-pane">
-                <TabBar
-                  locked={locked}
-                  onSwitch={switchToTab}
-                  runningTabId={busy || session ? activeId : null}
-                  onClose={doCloseTab}
-                  onTabMenu={(id, x, y) => setTabMenu({ id, x, y })}
-                  onNew={doNew}
-                  onOpen={() => void doOpen()}
-                  onSave={() => void doSave(false)}
-                  onSaveAs={() => void doSave(true)}
-                />
                 {run && (
                   <div className="editor-strip">
                     <Breadcrumb crumbs={crumbs} onJump={jumpToLine} />
@@ -1935,115 +2099,134 @@ export default function App(): JSX.Element {
             {focusMode && revealLine !== null && revealLine > 0 && (
               <CodePeek sql={sql} line={revealLine} />
             )}
-          <nav className="tabs">
-            <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')} title="Les jeux de données renvoyés par vos SELECT">
-              Résultats
-              {run && run.resultsets.length > 0 && (
-                <span className="tab-count">{run.resultsets.length}</span>
+            <div className="results-header" role="tablist">
+              {resultTab('results', Table2, 'Résultats', 'Les jeux de données renvoyés par vos SELECT', run?.resultsets.length)}
+              {resultTab('messages', MessageSquareText, 'Messages', 'Messages du serveur : lignes affectées, erreurs (double-clic → ligne fautive), heure de fin', messageErrors, 'error')}
+              <span className="results-sep" aria-hidden="true" />
+              {resultTab('run', SlidersHorizontal, 'Paramètres', 'Paramètres de la procédure, options (lecture seule, tables suivies), export et diagnostic')}
+              {resultTab('variables', Variable, 'Variables', "Valeur de toutes les variables à l'étape sélectionnée dans la chronologie")}
+              {resultTab('data', Camera, 'Données', 'Contenu des tables suivies après chaque écriture, avec le différentiel — même sans SELECT et malgré un ROLLBACK', run?.snapshots.length)}
+              {resultTab('inspect', ScanSearch, 'Inspect', 'Vos propres requêtes, réévaluées à chaque pause du débogage')}
+              {resultTab('profile', Gauge, 'Profil', 'Temps passé par ligne — se remplit après « Profiler »')}
+              <span className="results-spacer" />
+              <button
+                type="button"
+                className={`results-action${focusMode ? ' active' : ''}`}
+                onClick={() => setFocusMode((f) => !f)}
+                data-tip={focusMode ? "Réafficher l'éditeur SQL" : "Agrandir les résultats en masquant l'éditeur"}
+                data-shortcut={focusMode ? 'Échap' : undefined}
+              >
+                {focusMode ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
+                <span className="results-action-label">{focusMode ? 'Réafficher l’éditeur' : 'Agrandir'}</span>
+              </button>
+              {!focusMode && (
+                <button
+                  type="button"
+                  className="results-action icon"
+                  onClick={() => setResultsHidden(true)}
+                  data-tip="Masquer le volet de résultats"
+                  data-shortcut="Ctrl+R"
+                  aria-label="Masquer le volet de résultats"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
               )}
-            </button>
-            <button
-              className={tab === 'messages' ? 'active' : ''}
-              onClick={() => setTab('messages')}
-              title="Messages du serveur : lignes affectées, erreurs (double-clic → ligne fautive), heure de fin"
-            >
-              Messages
-              {messageErrors > 0 && <span className="tab-count error">{messageErrors}</span>}
-            </button>
-            <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')} title="Paramètres de la procédure, options et export — le point de départ avant de lancer">
-              Exécution
-            </button>
-            <button className={tab === 'variables' ? 'active' : ''} onClick={() => setTab('variables')} title="Valeur de toutes les variables au step sélectionné (rempli automatiquement par l’exécution)">
-              Variables
-            </button>
-            <button className={tab === 'data' ? 'active' : ''} onClick={() => setTab('data')} title="Contenu des tables suivies après chaque écriture, avec le différentiel — même sans SELECT et malgré un ROLLBACK">
-              Données
-              {run && run.snapshots.length > 0 && (
-                <span className="tab-count">{run.snapshots.length}</span>
+            </div>
+            <div className="tab-content">
+              {tab === 'run' && (
+                <RunPanel
+                  instr={instr}
+                  paramValues={paramValues}
+                  onParamChange={(name, value) => setParamValues((prev) => ({ ...prev, [name]: value }))}
+                  snapshotTargets={snapshotTargets}
+                  onSnapshotTargetsChange={setSnapshotTargets}
+                  readOnly={readOnly}
+                  onReadOnlyChange={setReadOnly}
+                  roWhitelist={roWhitelist}
+                  onRoWhitelistChange={setRoWhitelist}
+                  onExport={onExport}
+                  onDiagnose={() => setShowDiagnosis(true)}
+                />
               )}
-            </button>
-            <button className={tab === 'inspect' ? 'active' : ''} onClick={() => setTab('inspect')} title="Vos propres requêtes, réévaluées à chaque pause du débogage">
-              Inspect
-            </button>
-            <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')} title="Temps passé par ligne — se remplit après un ⚡ Profiler">
-              Profil
-            </button>
-            <button
-              className={`focus-toggle${focusMode ? ' active' : ''}`}
-              onClick={() => setFocusMode((f) => !f)}
-              title={
-                focusMode
-                  ? "Réafficher l'éditeur SQL (Échap)"
-                  : "Agrandir les résultats en masquant l'éditeur"
-              }
-            >
-              {focusMode ? '⤡ Réafficher l’éditeur' : '⤢ Agrandir'}
-            </button>
-          </nav>
-          <div className="tab-content">
-            {tab === 'run' && (
-              <RunPanel
-                instr={instr}
-                paramValues={paramValues}
-                onParamChange={(name, value) => setParamValues((prev) => ({ ...prev, [name]: value }))}
-                snapshotTargets={snapshotTargets}
-                onSnapshotTargetsChange={setSnapshotTargets}
-                readOnly={readOnly}
-                onReadOnlyChange={setReadOnly}
-                roWhitelist={roWhitelist}
-                onRoWhitelistChange={setRoWhitelist}
-                onExport={onExport}
-                onDiagnose={() => setShowDiagnosis(true)}
-              />
-            )}
-            {tab === 'variables' && (
-              <VariablesPanel onOpenProcedure={() => void openCalledProcedure()} />
-            )}
-            {tab === 'results' && <ResultsPanel />}
-            {tab === 'messages' && <MessagesPanel messages={messages} onGoToLine={goToLine} />}
-            {tab === 'data' && <SnapshotsPanel />}
-            {tab === 'inspect' && (
-              <InspectPanel
-                activeRef={activeRef}
-                sessionActive={session?.status === 'paused'}
-                pauseSeq={session?.paused?.seq ?? null}
-              />
-            )}
-            {tab === 'profile' && (
-              <ProfilePanel
-                stats={xeResult?.stats ?? null}
-                elapsedMs={xeResult?.elapsedMs ?? null}
-                resultsets={xeResult?.resultsets ?? []}
-                errors={xeResult?.errors ?? []}
-              />
-            )}
-          </div>
+              {tab === 'variables' && (
+                <VariablesPanel onOpenProcedure={() => void openCalledProcedure()} />
+              )}
+              {tab === 'results' && <ResultsPanel />}
+              {tab === 'messages' && <MessagesPanel messages={messages} onGoToLine={goToLine} />}
+              {tab === 'data' && <SnapshotsPanel />}
+              {tab === 'inspect' && (
+                <InspectPanel
+                  activeRef={activeRef}
+                  sessionActive={session?.status === 'paused'}
+                  pauseSeq={session?.paused?.seq ?? null}
+                />
+              )}
+              {tab === 'profile' && (
+                <ProfilePanel
+                  stats={xeResult?.stats ?? null}
+                  elapsedMs={xeResult?.elapsedMs ?? null}
+                  resultsets={xeResult?.resultsets ?? []}
+                  errors={xeResult?.errors ?? []}
+                />
+              )}
+            </div>
           </section>
+
+          {/* Pas de chronologie vide (pause avant la première instruction). */}
+          {run && run.steps.length > 0 && (
+            <>
+              <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 96, 480))} />
+              <div className="timeline-container" style={{ height: timelineHeight }}>
+                <Timeline />
+              </div>
+            </>
+          )}
+
+          <QueryStatusBar
+            connection={activeConn}
+            database={activeRef?.database ?? activeConn?.defaultDatabase ?? null}
+            run={run}
+            running={running && !paused}
+            paused={paused ? (session?.paused?.startLine ?? 0) : null}
+            failed={execError !== null}
+            cancelled={cancelled}
+            startedAt={runStartedAt}
+            finishedAt={runFinishedAt}
+          />
         </section>
       </main>
 
-      {run && (
-        <>
-          <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 96, 480))} />
-          <div className="timeline-container" style={{ height: timelineHeight }}>
-            <Timeline />
-          </div>
-        </>
-      )}
-
-      <StatusBar
-        connection={activeConn}
-        database={activeRef?.database ?? activeConn?.defaultDatabase ?? null}
-        run={run}
-        running={busy || session?.status === 'running'}
-        paused={session?.status === 'paused' ? (session.paused?.startLine ?? 0) : null}
-        failed={execError !== null}
-        cancelled={cancelled}
-        startedAt={runStartedAt}
-        finishedAt={runFinishedAt}
-        selectionLines={selectionLines}
+      <MainStatusBar
+        busy={running && !paused}
         cursor={cursor}
+        selectionLines={selectionLines}
+        engineRunning={status?.running ?? false}
+        engineVersion={status?.version ?? null}
+        appVersion={appVersion}
+        onVersionClick={() => setWhatsNewSince('')}
       />
+
+      {/* Messages flottants : les erreurs restent jusqu'à fermeture, les infos s'effacent seules. */}
+      <div className="toast-stack" aria-live="polite">
+        {error && (
+          <div className="toast error" role="alert">
+            <TriangleAlert size={16} aria-hidden="true" />
+            <span className="toast-text">{error}</span>
+            <button type="button" className="toast-close" onClick={() => setError(null)} aria-label="Fermer">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div className="toast info" key={notice}>
+            <Info size={16} aria-hidden="true" />
+            <span className="toast-text">{notice}</span>
+            <button type="button" className="toast-close" onClick={() => setNotice(null)} aria-label="Fermer">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

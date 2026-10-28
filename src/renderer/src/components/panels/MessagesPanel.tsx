@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { RunMessage } from '../../lib/messages'
+import { MessageSquareText } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 /**
  * Onglet « Messages » (comme SSMS) : lignes affectées, erreurs en rouge,
@@ -16,7 +18,12 @@ export default function MessagesPanel({
   const [selected, setSelected] = useState<number | null>(null)
 
   if (messages.length === 0) {
-    return <p className="hint">Exécuter d&apos;abord (▶) : les messages du serveur s&apos;afficheront ici.</p>
+    return (
+      <EmptyState icon={MessageSquareText} title="Aucun message">
+        Après l&apos;exécution : lignes affectées, erreurs (double-cliquez pour aller à la ligne)
+        et heure de fin.
+      </EmptyState>
+    )
   }
 
   return (

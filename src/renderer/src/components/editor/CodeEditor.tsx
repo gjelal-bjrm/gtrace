@@ -3,7 +3,7 @@ import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { useEffect, useRef } from 'react'
 import { registerSqlCompletion } from './completion'
 import { useAppearanceStore } from '../../stores/appearanceStore'
-import { findTheme } from '../../theme/themes'
+import { findTheme, THEMES } from '../../theme/themes'
 
 self.MonacoEnvironment = {
   getWorker: () => new editorWorker()
@@ -32,42 +32,58 @@ export async function editorPaste(): Promise<void> {
   editor.executeEdits('menu', [{ range: sel, text, forceMoveMarkers: true }])
 }
 
-monaco.editor.defineTheme('gtrace-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: 'keyword.sql', foreground: 'd9a441' },
-    { token: 'string.sql', foreground: '7dbb7d' },
-    { token: 'comment.sql', foreground: '6b7080' }
-  ],
-  colors: {
-    'editor.background': '#14161a',
-    'editor.lineHighlightBackground': '#1d2026',
-    'editorLineNumber.foreground': '#4a4f59',
-    'editorLineNumber.activeForeground': '#8b909a',
-    'editorGutter.background': '#14161a'
-  }
-})
-
-// Thème clair : coloration SQL classique —
-// mots-clés bleus, chaînes rouges, commentaires verts.
-monaco.editor.defineTheme('gtrace-light', {
-  base: 'vs',
-  inherit: true,
-  rules: [
+// Coloration SQL par famille de thèmes : celle de SSMS en clair (mots-clés
+// bleus, chaînes rouges, commentaires verts), celle de Visual Studio en sombre,
+// l'ambre pour l'identité GTrace.
+const SQL_RULES: Record<string, monaco.editor.ITokenThemeRule[]> = {
+  light: [
     { token: 'keyword.sql', foreground: '0000ff' },
     { token: 'string.sql', foreground: 'a31515' },
     { token: 'comment.sql', foreground: '008000' },
     { token: 'number.sql', foreground: '098658' }
   ],
-  colors: {
-    'editor.background': '#ffffff',
-    'editor.lineHighlightBackground': '#f0f4f8',
-    'editorLineNumber.foreground': '#9aa4b0',
-    'editorLineNumber.activeForeground': '#3d4b59',
-    'editorGutter.background': '#ffffff'
-  }
-})
+  amber: [
+    { token: 'keyword.sql', foreground: 'd9a441' },
+    { token: 'string.sql', foreground: '7dbb7d' },
+    { token: 'comment.sql', foreground: '6b7080' }
+  ],
+  vsDark: [
+    { token: 'keyword.sql', foreground: '569cd6' },
+    { token: 'string.sql', foreground: 'ce9178' },
+    { token: 'comment.sql', foreground: '6a9955' },
+    { token: 'number.sql', foreground: 'b5cea8' }
+  ],
+  contrast: [
+    { token: 'keyword.sql', foreground: 'ffd400' },
+    { token: 'string.sql', foreground: '00e05a' },
+    { token: 'comment.sql', foreground: '9a9a9a' }
+  ]
+}
+
+// Un thème d'éditeur par thème d'application : même fond que les panneaux.
+for (const t of THEMES) {
+  const dark = t.base === 'dark'
+  const surface = t.vars.surface ?? (dark ? '#14161a' : '#ffffff')
+  monaco.editor.defineTheme(`gtrace-${t.id}`, {
+    base: dark ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules:
+      t.id === 'azur'
+        ? SQL_RULES.light
+        : t.id === 'ambre'
+          ? SQL_RULES.amber
+          : t.id === 'contrast'
+            ? SQL_RULES.contrast
+            : SQL_RULES.vsDark,
+    colors: {
+      'editor.background': surface,
+      'editorGutter.background': surface,
+      'editor.lineHighlightBackground': dark ? '#ffffff0b' : '#f0f4f8',
+      'editorLineNumber.foreground': dark ? '#5a606b' : '#9aa4b0',
+      'editorLineNumber.activeForeground': dark ? '#a3a9b3' : '#3d4b59'
+    }
+  })
+}
 
 export type DecorationKind =
   | 'current'
@@ -181,9 +197,7 @@ export default function CodeEditor({
 
   // L'éditeur suit le thème de l'application (clair/sombre) et la taille de
   // police choisie dans le dialogue Apparence.
-  const monacoTheme = useAppearanceStore((s) =>
-    findTheme(s.appearance.themeId).base === 'light' ? 'gtrace-light' : 'gtrace-dark'
-  )
+  const monacoTheme = useAppearanceStore((s) => `gtrace-${findTheme(s.appearance.themeId).id}`)
   const editorFontSize = useAppearanceStore((s) => s.appearance.editorFontSize)
 
   useEffect(() => {

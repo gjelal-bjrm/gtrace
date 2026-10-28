@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { Check, ChevronRight, type LucideIcon } from 'lucide-react'
 
 /**
  * Menu contextuel de l'explorateur d'objets (clic droit), avec sous-menus
@@ -16,6 +17,8 @@ export type MenuItem =
       shortcut?: string
       /** Coche devant l'entrée (bascules du menu Affichage) */
       checked?: boolean
+      /** Icône devant l'entrée : la même que sur le bouton de barre d'outils */
+      icon?: LucideIcon
       children?: MenuItem[]
     }
 
@@ -44,10 +47,16 @@ function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => void }):
                 onDone()
               }}
             >
-              <span className="ctx-check">{item.checked ? '✓' : ''}</span>
-              {item.label}
-              {item.children && <span className="ctx-arrow">▸</span>}
+              <span className="ctx-check">
+                {item.checked ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : item.icon ? (
+                  <item.icon size={14} strokeWidth={1.8} aria-hidden="true" />
+                ) : null}
+              </span>
+              <span className="ctx-text">{item.label}</span>
               {item.shortcut && <span className="ctx-key">{item.shortcut}</span>}
+              {item.children && <ChevronRight size={14} className="ctx-arrow" aria-hidden="true" />}
             </button>
             {item.children && open === i && (
               <div className="ctx-menu ctx-submenu">

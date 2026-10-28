@@ -28,7 +28,30 @@ import {
   selectTopScript,
   updateScript
 } from '../../lib/scriptGen'
+import {
+  ChevronRight,
+  ChevronsDownUp,
+  Columns3,
+  Database,
+  Eye,
+  Folder,
+  FolderOpen,
+  Funnel,
+  KeyRound,
+  ListFilter,
+  LoaderCircle,
+  Plug,
+  RefreshCw,
+  ScrollText,
+  Server,
+  SquareFunction,
+  Table2,
+  Unplug,
+  type LucideIcon
+} from 'lucide-react'
 import TreeMenu, { type MenuItem } from './TreeMenu'
+import DockPanel from '../layout/DockPanel'
+import { ToolButton } from '../ui/ToolButton'
 
 /** Un script à ouvrir dans un nouvel onglet, lié à une connexion + base. */
 export interface OpenScript {
@@ -50,17 +73,70 @@ interface Props {
   onNewQuery: (connectionId: string, database: string | null) => void
   /** Message court (ex. « copié dans le presse-papiers ») */
   onNotice: (text: string) => void
+  /** Masquer le panneau (F8 le réaffiche) */
+  onHide: () => void
   locked: boolean
 }
 
 type ObjKind = 'tables' | 'views' | 'procedures' | 'functions'
 
-const FOLDERS: { kind: ObjKind; label: string; icon: string }[] = [
-  { kind: 'tables', label: 'Tables', icon: '▦' },
-  { kind: 'views', label: 'Vues', icon: '◫' },
-  { kind: 'procedures', label: 'Procédures stockées', icon: '⚙' },
-  { kind: 'functions', label: 'Fonctions', icon: 'ƒ' }
+const FOLDERS: { kind: ObjKind; label: string }[] = [
+  { kind: 'tables', label: 'Tables' },
+  { kind: 'views', label: 'Vues' },
+  { kind: 'procedures', label: 'Procédures stockées' },
+  { kind: 'functions', label: 'Fonctions' }
 ]
+
+/** Icône de chaque type d'objet ; la couleur vient du thème (.ti-…). */
+const OBJECT_ICON: Record<ObjKind, LucideIcon> = {
+  tables: Table2,
+  views: Eye,
+  procedures: ScrollText,
+  functions: SquareFunction
+}
+
+/** Clé d'un dossier filtrable (Tables, Vues, Procédures, Fonctions). */
+const FOLDER_KEY = /\/(tables|views|procedures|functions)$/
+
+function TreeIcon({ icon: Icon, tone }: { icon: LucideIcon; tone: string }): JSX.Element {
+  return (
+    <span className={`tree-icon ti-${tone}`}>
+      <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+    </span>
+  )
+}
+
+/** Flèche de dépliage : pivote d'un quart de tour à l'ouverture. */
+function Twisty({
+  open,
+  onClick,
+  disabled = false
+}: {
+  open: boolean
+  onClick: () => void
+  disabled?: boolean
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`tree-twisty${open ? ' open' : ''}`}
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={open ? 'Replier' : 'Déplier'}
+      aria-expanded={open}
+    >
+      <ChevronRight size={14} aria-hidden="true" />
+    </button>
+  )
+}
+
+function Loading({ depth, text = 'chargement…' }: { depth: number; text?: string }): JSX.Element {
+  return (
+    <div className="tree-loading" style={indent(depth)}>
+      <LoaderCircle size={13} className="spin" aria-hidden="true" /> {text}
+    </div>
+  )
+}
 
 /** Référence serveur ciblant une base précise (surcharge résolue côté main). */
 function refFor(conn: OpenConnection, database: string): ConnectionRef {
@@ -96,9 +172,11 @@ export default function ObjectExplorer({
   onDisconnect,
   onNewQuery,
   onNotice,
+  onHide,
   locked
 }: Props): JSX.Element {
   const connections = useConnectionsStore((s) => s.connections)
+  const focused = useExplorerStore((s) => s.focusArea === 'explorer')
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [databases, setDatabases] = useState<Record<string, DatabaseInfo[] | 'loading'>>({})
@@ -390,11 +468,11 @@ export default function ObjectExplorer({
   })
 
   // ─── Rendu de l'arbre (récursif, aplati en lignes indentées) ───────────────
-  const renderColumns = (conn: OpenConnection, db: string, o: DbObjectInfo): JSX.Element[] => {
+  const renderColumns = (conn: OpenConnection, db: string, o: DbObjectInfo, depth: number): JSX.Element[] => {
     const key = `${conn.id}/${db}/${o.objectId}`
     if (!isOpen(key)) return []
     const cols = columns[key]
-    if (cols === 'loading') return [<div key={`${key}-l`} className="tree-loading" style={indent(5)}>chargement…</div>]
+    if (cols === 'loading') return [<Loading key={`${key}-l`} depth={depth} />]
     if (!Array.isArray(cols)) return []
     const colsKey = `${key}/__cols__`
     return [
@@ -402,7 +480,7 @@ export default function ObjectExplorer({
       <div
         key={colsKey}
         className="tree-row"
-        style={indent(5)}
+        style={indent(depth)}
         title="Glisser vers l'éditeur pour insérer la liste des colonnes"
         {...rowSel(colsKey, conn.id, db)}
         {...dragText(cols.map((c) => c.name).join(', '))}
@@ -414,8 +492,9 @@ export default function ObjectExplorer({
         ])}
       >
         <span className="tree-twisty" />
-        <span className="tree-icon">📁</span>
-        <span className="tree-label tree-group">Colonnes</span>
+        <TreeIcon icon={FolderOpen} tone="folder" />
+        <span className="tree-label">Colonnes</span>
+        <span className="tree-meta">{cols.length}</span>
       </div>,
       ...cols.map((c) => {
         const ck = `${key}/${c.name}`
@@ -423,7 +502,7 @@ export default function ObjectExplorer({
           <div
             key={ck}
             className="tree-row tree-leaf"
-            style={indent(6)}
+            style={indent(depth + 1)}
             title={columnLabel(c)}
             {...rowSel(ck, conn.id, db)}
             {...dragText(c.name)}
@@ -431,7 +510,8 @@ export default function ObjectExplorer({
               { label: 'Copier le nom', onClick: () => void copyText(c.name).then(() => onNotice('Nom copié.')) }
             ])}
           >
-            <span className="tree-icon">{c.isPrimaryKey ? '🔑' : '▪'}</span>
+            <span className="tree-twisty" />
+            {c.isPrimaryKey ? <TreeIcon icon={KeyRound} tone="key" /> : <TreeIcon icon={Columns3} tone="column" />}
             <span className="tree-label">{columnLabel(c)}</span>
           </div>
         )
@@ -443,7 +523,8 @@ export default function ObjectExplorer({
     conn: OpenConnection,
     db: string,
     o: DbObjectInfo,
-    kind: ObjKind
+    kind: ObjKind,
+    depth: number
   ): JSX.Element => {
     const hasColumns = kind === 'tables' || kind === 'views'
     const key = `${conn.id}/${db}/${o.objectId}`
@@ -454,7 +535,7 @@ export default function ObjectExplorer({
       <div key={key}>
         <div
           className="tree-row"
-          style={indent(4)}
+          style={indent(depth)}
           {...rowSel(key, conn.id, db)}
           {...dragText(qualify(o.schema, o.name))}
           onDoubleClick={() => {
@@ -463,26 +544,25 @@ export default function ObjectExplorer({
           }}
           onContextMenu={contextMenu(key, conn.id, db, () => objectMenu(conn, db, o, kind))}
         >
-          {hasColumns ? (
-            <button className="tree-twisty" onClick={toggleCols}>
-              {isOpen(key) ? '▾' : '▸'}
-            </button>
-          ) : (
-            <span className="tree-twisty" />
-          )}
-          <span className="tree-icon">
-            {kind === 'tables' ? '▦' : kind === 'views' ? '◫' : kind === 'procedures' ? '⚙' : 'ƒ'}
-          </span>
+          {hasColumns ? <Twisty open={isOpen(key)} onClick={toggleCols} /> : <span className="tree-twisty" />}
+          <TreeIcon icon={OBJECT_ICON[kind]} tone={kind} />
           <span className="tree-label" title={label}>
-            {label}
+            <span className="tree-schema">{o.schema}.</span>
+            {o.name}
           </span>
         </div>
-        {hasColumns && renderColumns(conn, db, o)}
+        {hasColumns && renderColumns(conn, db, o, depth + 1)}
       </div>
     )
   }
 
-  const renderFolder = (conn: OpenConnection, db: string, kind: ObjKind, label: string, icon: string): JSX.Element => {
+  const renderFolder = (
+    conn: OpenConnection,
+    db: string,
+    kind: ObjKind,
+    label: string,
+    depth: number
+  ): JSX.Element => {
     const dbKey = `${conn.id}/${db}`
     const folderKey = `${dbKey}/${kind}`
     const objs = objects[dbKey]
@@ -509,20 +589,22 @@ export default function ObjectExplorer({
       <div key={folderKey}>
         <div
           className="tree-row"
-          style={indent(3)}
+          style={indent(depth)}
           {...rowSel(folderKey, conn.id, db)}
           onDoubleClick={() => toggle(folderKey)}
           onContextMenu={contextMenu(folderKey, conn.id, db, () => [
-            { label: 'Filtrer…', onClick: startFilter },
+            { label: 'Filtrer…', icon: ListFilter, onClick: startFilter },
             { label: 'Supprimer le filtre', disabled: !filters[folderKey], onClick: clearFilter },
             'sep',
-            { label: 'Actualiser', onClick: () => refreshers.current[folderKey]?.() }
+            { label: 'Actualiser', icon: RefreshCw, onClick: () => refreshers.current[folderKey]?.() }
           ])}
         >
-          <button className="tree-twisty" onClick={() => toggle(folderKey)}>
-            {isOpen(folderKey) ? '▾' : '▸'}
-          </button>
-          <span className="tree-icon">{filter ? '⏷' : icon}</span>
+          <Twisty open={isOpen(folderKey)} onClick={() => toggle(folderKey)} />
+          {filter ? (
+            <TreeIcon icon={Funnel} tone="filter" />
+          ) : (
+            <TreeIcon icon={isOpen(folderKey) ? FolderOpen : Folder} tone="folder" />
+          )}
           <span className="tree-label">
             {label}
             {filter ? ' (filtré)' : ''}
@@ -532,7 +614,7 @@ export default function ObjectExplorer({
           </span>
         </div>
         {editingFilter === folderKey && (
-          <div className="tree-filter" style={indent(4)}>
+          <div className="tree-filter" style={indent(depth + 1)}>
             <input
               autoFocus
               placeholder="Le nom contient…"
@@ -546,12 +628,12 @@ export default function ObjectExplorer({
             />
           </div>
         )}
-        {isOpen(folderKey) && objs !== 'loading' && list.map((o) => renderObject(conn, db, o, kind))}
+        {isOpen(folderKey) && objs !== 'loading' && list.map((o) => renderObject(conn, db, o, kind, depth + 1))}
       </div>
     )
   }
 
-  const renderDatabase = (conn: OpenConnection, db: DatabaseInfo): JSX.Element => {
+  const renderDatabase = (conn: OpenConnection, db: DatabaseInfo, depth: number): JSX.Element => {
     const dbKey = `${conn.id}/${db.name}`
     const toggleDb = (): void => toggle(dbKey, () => void loadObjects(conn, db.name))
     refreshers.current[dbKey] = () => {
@@ -562,32 +644,27 @@ export default function ObjectExplorer({
       <div key={dbKey}>
         <div
           className="tree-row"
-          style={indent(2)}
+          style={indent(depth)}
           {...rowSel(dbKey, conn.id, db.name)}
           onDoubleClick={() => db.online && toggleDb()}
           onContextMenu={contextMenu(dbKey, conn.id, db.name, () => [
             { label: 'Nouvelle requête', bold: true, disabled: locked, onClick: () => onNewQuery(conn.id, db.name) },
             'sep',
-            { label: 'Actualiser', disabled: !db.online, onClick: () => refreshers.current[dbKey]?.() }
+            { label: 'Actualiser', icon: RefreshCw, disabled: !db.online, onClick: () => refreshers.current[dbKey]?.() }
           ])}
         >
-          <button className="tree-twisty" disabled={!db.online} onClick={toggleDb}>
-            {isOpen(dbKey) ? '▾' : '▸'}
-          </button>
-          <span className="tree-icon">🗄</span>
+          <Twisty open={isOpen(dbKey)} disabled={!db.online} onClick={toggleDb} />
+          <TreeIcon icon={Database} tone="database" />
           <span className={`tree-label${db.name === conn.defaultDatabase ? ' tree-default' : ''}`}>
             {db.name}
           </span>
           {!db.online && <span className="tree-meta">hors ligne</span>}
         </div>
-        {isOpen(dbKey) &&
-          objects[dbKey] === 'loading' && (
-            <div className="tree-loading" style={indent(3)}>chargement…</div>
-          )}
+        {isOpen(dbKey) && objects[dbKey] === 'loading' && <Loading depth={depth + 1} />}
         {isOpen(dbKey) &&
           objects[dbKey] &&
           objects[dbKey] !== 'loading' &&
-          FOLDERS.map((f) => renderFolder(conn, db.name, f.kind, f.label, f.icon))}
+          FOLDERS.map((f) => renderFolder(conn, db.name, f.kind, f.label, depth + 1))}
       </div>
     )
   }
@@ -596,13 +673,19 @@ export default function ObjectExplorer({
     const dbs = databases[conn.id]
     const user = dbs && dbs !== 'loading' ? dbs.filter((d) => !d.system) : []
     const system = dbs && dbs !== 'loading' ? dbs.filter((d) => d.system) : []
+    const dbsKey = `${conn.id}/__dbs__`
     const sysKey = `${conn.id}/__system__`
-    const toggleServer = (): void => toggle(conn.id, () => void loadDatabases(conn))
+    // Comme SSMS, déplier un serveur montre directement le dossier « Bases de données » ouvert.
+    const toggleServer = (): void => {
+      toggle(conn.id, () => void loadDatabases(conn))
+      expand(dbsKey)
+    }
     refreshers.current[conn.id] = () => {
       dropColumns(`${conn.id}/`)
       setObjects((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !k.startsWith(`${conn.id}/`))))
       void loadDatabases(conn, true)
     }
+    refreshers.current[dbsKey] = refreshers.current[conn.id]
     return (
       <div key={conn.id} className="tree-server">
         <div
@@ -613,92 +696,141 @@ export default function ObjectExplorer({
           onContextMenu={contextMenu(conn.id, conn.id, null, () => [
             { label: 'Nouvelle requête', bold: true, disabled: locked, onClick: () => onNewQuery(conn.id, null) },
             'sep',
-            { label: 'Connecter…', onClick: onConnect },
-            { label: 'Déconnexion', disabled: locked, onClick: () => onDisconnect(conn.id) },
+            { label: 'Connecter…', icon: Plug, onClick: onConnect },
+            { label: 'Déconnexion', icon: Unplug, disabled: locked, onClick: () => onDisconnect(conn.id) },
             'sep',
-            { label: 'Actualiser', onClick: () => refreshers.current[conn.id]?.() }
+            { label: 'Actualiser', icon: RefreshCw, onClick: () => refreshers.current[conn.id]?.() }
           ])}
         >
-          <button className="tree-twisty" onClick={toggleServer}>
-            {isOpen(conn.id) ? '▾' : '▸'}
-          </button>
-          <span className="tree-icon">{conn.production ? '⚠' : '🖥'}</span>
+          <Twisty open={isOpen(conn.id)} onClick={toggleServer} />
+          <span className={`tree-icon ti-server${conn.production ? ' prod' : ''}`}>
+            <Server size={15} strokeWidth={1.8} aria-hidden="true" />
+          </span>
           <span className="tree-label" title={`${conn.version} — ${conn.user}`}>
             {conn.label}
-          </span>
-          <span className="tree-actions">
-            <button
-              className="tree-action"
-              title={locked ? 'Session active — déconnexion gelée' : 'Se déconnecter'}
-              disabled={locked}
-              onClick={() => onDisconnect(conn.id)}
-            >
-              ⏏
-            </button>
+            <span className="tree-server-meta">
+              {' '}
+              ({conn.user}){conn.production ? ' · production' : ''}
+            </span>
           </span>
         </div>
-        {isOpen(conn.id) && dbs === 'loading' && (
-          <div className="tree-loading" style={indent(1)}>chargement des bases…</div>
-        )}
+        {isOpen(conn.id) && dbs === 'loading' && <Loading depth={1} text="chargement des bases…" />}
         {isOpen(conn.id) && dbs && dbs !== 'loading' && (
-          <>
-            <div className="tree-row" style={indent(1)}>
-              <span className="tree-twisty" />
-              <span className="tree-icon">📁</span>
-              <span className="tree-label tree-group">Bases de données ({user.length})</span>
+          <div key={dbsKey}>
+            <div
+              className="tree-row"
+              style={indent(1)}
+              {...rowSel(dbsKey, conn.id, null)}
+              onDoubleClick={() => toggle(dbsKey)}
+              onContextMenu={contextMenu(dbsKey, conn.id, null, () => [
+                { label: 'Nouvelle requête', bold: true, disabled: locked, onClick: () => onNewQuery(conn.id, null) },
+                'sep',
+                { label: 'Actualiser', icon: RefreshCw, onClick: () => refreshers.current[conn.id]?.() }
+              ])}
+            >
+              <Twisty open={isOpen(dbsKey)} onClick={() => toggle(dbsKey)} />
+              <TreeIcon icon={isOpen(dbsKey) ? FolderOpen : Folder} tone="folder" />
+              <span className="tree-label">Bases de données</span>
+              <span className="tree-meta">{user.length}</span>
             </div>
-            {user.map((d) => renderDatabase(conn, d))}
-            {system.length > 0 && (
-              <div key={sysKey}>
-                <div className="tree-row" style={indent(1)} onDoubleClick={() => toggle(sysKey)}>
-                  <button className="tree-twisty" onClick={() => toggle(sysKey)}>
-                    {isOpen(sysKey) ? '▾' : '▸'}
-                  </button>
-                  <span className="tree-icon">📁</span>
-                  <span className="tree-label tree-group">Bases système ({system.length})</span>
-                </div>
-                {isOpen(sysKey) && system.map((d) => renderDatabase(conn, d))}
-              </div>
+            {isOpen(dbsKey) && (
+              <>
+                {system.length > 0 && (
+                  <div key={sysKey}>
+                    <div
+                      className="tree-row"
+                      style={indent(2)}
+                      {...rowSel(sysKey, conn.id, null)}
+                      onDoubleClick={() => toggle(sysKey)}
+                    >
+                      <Twisty open={isOpen(sysKey)} onClick={() => toggle(sysKey)} />
+                      <TreeIcon icon={isOpen(sysKey) ? FolderOpen : Folder} tone="folder" />
+                      <span className="tree-label">Bases de données système</span>
+                      <span className="tree-meta">{system.length}</span>
+                    </div>
+                    {isOpen(sysKey) && system.map((d) => renderDatabase(conn, d, 3))}
+                  </div>
+                )}
+                {user.map((d) => renderDatabase(conn, d, 2))}
+              </>
             )}
-          </>
+          </div>
         )}
       </div>
     )
   }
 
+  const selection = useExplorerStore((s) => s.selection)
+  const refreshSelected = (): void => {
+    if (selection) refreshers.current[selection.key]?.()
+  }
+  const filterTarget = selection && FOLDER_KEY.test(selection.key) ? selection.key : null
+
   return (
-    <div className="object-explorer">
-      <div className="explorer-toolbar">
-        <span className="explorer-title">Explorateur d&apos;objets</span>
-        <button
-          className="btn btn-sm btn-icon"
-          onClick={() => {
-            const key = useExplorerStore.getState().selection?.key
-            if (key) refreshers.current[key]?.()
-          }}
-          title="Actualiser l'élément sélectionné (F5 quand l'explorateur a le focus)"
-        >
-          ⟳
-        </button>
-        <button className="btn btn-sm btn-primary" onClick={onConnect} title="Se connecter à un serveur">
-          🔌 Connecter
-        </button>
-      </div>
+    <DockPanel
+      title="Explorateur d'objets"
+      className="object-explorer"
+      focused={focused}
+      onClose={onHide}
+      closeTip="Masquer l'explorateur (F8)"
+      toolbar={
+        <>
+          <button type="button" className="dock-text-btn" onClick={onConnect} data-tip="Se connecter à un serveur">
+            <Plug size={14} aria-hidden="true" />
+            Connecter
+          </button>
+          <ToolButton
+            icon={Unplug}
+            label="Déconnecter le serveur sélectionné"
+            disabled={!selection || locked}
+            onClick={() => selection && onDisconnect(selection.connectionId)}
+          />
+          <ToolButton
+            icon={ListFilter}
+            label="Filtrer le dossier sélectionné (Tables, Vues, Procédures…)"
+            disabled={!filterTarget}
+            onClick={() => {
+              if (!filterTarget) return
+              expand(filterTarget)
+              setEditingFilter(filterTarget)
+            }}
+          />
+          <ToolButton
+            icon={RefreshCw}
+            label="Actualiser l'élément sélectionné"
+            shortcut="F5"
+            disabled={!selection}
+            onClick={refreshSelected}
+          />
+          <ToolButton
+            icon={ChevronsDownUp}
+            label="Tout replier"
+            disabled={expanded.size === 0}
+            onClick={() => setExpanded(new Set())}
+          />
+        </>
+      }
+    >
       {error && <div className="error-box explorer-error">{error}</div>}
-      <div className="tree">
+      <div className="tree" role="tree">
         {connections.length === 0 ? (
-          <p className="hint tree-empty">
-            Aucune connexion. Cliquez « Connecter » pour vous connecter à une instance SQL Server.
-          </p>
+          <div className="tree-empty">
+            <Server size={28} strokeWidth={1.4} aria-hidden="true" />
+            <p>Aucun serveur connecté.</p>
+            <button type="button" className="btn btn-primary" onClick={onConnect}>
+              <Plug size={14} aria-hidden="true" /> Se connecter…
+            </button>
+          </div>
         ) : (
           connections.map(renderServer)
         )}
       </div>
       {menu && <TreeMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
-    </div>
+    </DockPanel>
   )
 }
 
+/** Retrait d'un niveau ; --depth dessine les traits de niveau (voir .tree-row::before). */
 function indent(depth: number): CSSProperties {
-  return { paddingLeft: `${6 + depth * 14}px` }
+  return { paddingLeft: `${4 + depth * 16}px`, '--depth': depth } as CSSProperties
 }

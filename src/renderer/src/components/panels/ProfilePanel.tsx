@@ -1,5 +1,7 @@
 import type { ResultSetData, StepError, XeLineStat } from '@shared/types'
 import { formatSqlValue } from '../../stores/replayStore'
+import { Gauge } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 interface Props {
   stats: XeLineStat[] | null
@@ -13,11 +15,12 @@ const formatUs = (us: number): string => (us >= 1000 ? `${(us / 1000).toFixed(1)
 export default function ProfilePanel({ stats, elapsedMs, resultsets, errors }: Props): JSX.Element {
   if (!stats) {
     return (
-      <p className="hint">
-        « ⚡ Profiler » exécute le code <strong>sans instrumentation</strong> et capture durées et
-        rowcounts par ligne via Extended Events (permission ALTER ANY EVENT SESSION requise).
-        La heatmap colore les lignes lentes dans l&apos;éditeur.
-      </p>
+      <EmptyState icon={Gauge} title="Aucun profil pour l'instant">
+        « Profiler » (barre d&apos;outils ou menu Requête) exécute le code{' '}
+        <strong>sans instrumentation</strong> et mesure le temps passé sur chaque ligne (Extended
+        Events, permission ALTER ANY EVENT SESSION requise). Les lignes lentes se colorent dans
+        l&apos;éditeur.
+      </EmptyState>
     )
   }
 
