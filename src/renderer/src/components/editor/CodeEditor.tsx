@@ -191,7 +191,10 @@ export default function CodeEditor({
       padding: { top: 8 },
       quickSuggestions: { other: true, comments: false, strings: false },
       suggestOnTriggerCharacters: true,
-      wordBasedSuggestions: 'currentDocument'
+      wordBasedSuggestions: 'currentDocument',
+      // Le dépôt depuis l'explorateur est géré plus bas : celui de Monaco
+      // insère le texte comme un modèle et laisse un « $0 » parasite.
+      dropIntoEditor: { enabled: false }
     })
     editorRef.current = editor
     collectionRef.current = editor.createDecorationsCollection()
@@ -225,6 +228,31 @@ export default function CodeEditor({
     // Tests automatisés en développement uniquement (jamais dans l'application installée).
     if (import.meta.env.DEV) (window as unknown as { __gtraceEditor?: unknown }).__gtraceEditor = editor
 
+    // Glisser un objet de l'explorateur : son nom est inséré à l'endroit du
+    // dépôt et reste sélectionné (comme SSMS).
+    const host = hostRef.current!
+    const onDragOver = (e: DragEvent): void => {
+      if (e.dataTransfer?.types.includes('text/plain')) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent): void => {
+      const text = e.dataTransfer?.getData('text/plain')
+      if (!text) return
+      e.preventDefault()
+      e.stopPropagation()
+      const model = editor.getModel()
+      if (!model) return
+      const target = editor.getTargetAtClientPoint(e.clientX, e.clientY)
+      const last = model.getLineCount()
+      const pos = target?.position ?? { lineNumber: last, column: model.getLineMaxColumn(last) }
+      const range = new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column)
+      editor.executeEdits('drop', [{ range, text, forceMoveMarkers: true }])
+      const end = model.modifyPosition(range.getStartPosition(), text.length)
+      editor.setSelection(monaco.Range.fromPositions(range.getStartPosition(), end))
+      editor.focus()
+    }
+    host.addEventListener('dragover', onDragOver, true)
+    host.addEventListener('drop', onDrop, true)
+
     const cursorSub = editor.onDidChangeCursorPosition((e) =>
       onCursorRef.current?.(e.position.lineNumber, e.position.column)
     )
@@ -246,6 +274,8 @@ export default function CodeEditor({
       mouseSub.dispose()
       selSub.dispose()
       cursorSub.dispose()
+      host.removeEventListener('dragover', onDragOver, true)
+      host.removeEventListener('drop', onDrop, true)
       editor.dispose()
       editorRef.current = null
     }

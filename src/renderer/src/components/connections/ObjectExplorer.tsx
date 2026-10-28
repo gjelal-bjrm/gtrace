@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type MouseEvent
+} from 'react'
 import type {
   ColumnInfo,
   ConnectionRef,
@@ -8,6 +16,19 @@ import type {
 } from '@shared/types'
 import { useConnectionsStore, type OpenConnection } from '../../stores/connectionsStore'
 import { useExplorerStore } from '../../stores/explorerStore'
+import { copyText } from '../../lib/clipboard'
+import {
+  alterScript,
+  createScript,
+  deleteScript,
+  executeScript,
+  insertScript,
+  qualify,
+  selectScript,
+  selectTopScript,
+  updateScript
+} from '../../lib/scriptGen'
+import TreeMenu, { type MenuItem } from './TreeMenu'
 
 /** Un script à ouvrir dans un nouvel onglet, lié à une connexion + base. */
 export interface OpenScript {
@@ -17,12 +38,18 @@ export interface OpenScript {
   database: string
   /** Analyser immédiatement (procédures) vs simple script (SELECT généré) */
   analyze: boolean
+  /** Exécuter aussitôt (« Sélectionner les 1000 premières lignes », comme SSMS) */
+  execute?: boolean
 }
 
 interface Props {
   onOpenScript: (script: OpenScript) => void
   onConnect: () => void
   onDisconnect: (connectionId: string) => void
+  /** « Nouvelle requête » du clic droit : onglet connecté à ce serveur / cette base */
+  onNewQuery: (connectionId: string, database: string | null) => void
+  /** Message court (ex. « copié dans le presse-papiers ») */
+  onNotice: (text: string) => void
   locked: boolean
 }
 
@@ -40,19 +67,35 @@ function refFor(conn: OpenConnection, database: string): ConnectionRef {
   return { ...conn.ref, database }
 }
 
-/** Identifiant délimité SQL Server : les `]` internes doivent être doublés. */
-function bracket(id: string): string {
-  return `[${id.replace(/]/g, ']]')}]`
+/** Libellé d'une colonne façon SSMS : « color_id (PK, int, non NULL) ». */
+function columnLabel(c: ColumnInfo): string {
+  const parts = [c.isPrimaryKey ? 'PK' : null, c.dataType, c.isNullable ? 'NULL' : 'non NULL']
+  return `${c.name} (${parts.filter(Boolean).join(', ')})`
 }
 
-function qualify(schema: string, name: string): string {
-  return `${bracket(schema)}.${bracket(name)}`
+/** Glisser un nœud vers l'éditeur insère son nom (comme SSMS). */
+function dragText(text: string) {
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.setData('text/plain', text)
+      e.dataTransfer.effectAllowed = 'copy'
+    }
+  }
+}
+
+interface Menu {
+  x: number
+  y: number
+  items: MenuItem[]
 }
 
 export default function ObjectExplorer({
   onOpenScript,
   onConnect,
   onDisconnect,
+  onNewQuery,
+  onNotice,
   locked
 }: Props): JSX.Element {
   const connections = useConnectionsStore((s) => s.connections)
@@ -62,14 +105,18 @@ export default function ObjectExplorer({
   const [objects, setObjects] = useState<Record<string, DbObjects | 'loading'>>({})
   const [columns, setColumns] = useState<Record<string, ColumnInfo[] | 'loading'>>({})
   const [error, setError] = useState<string | null>(null)
+  const [menu, setMenu] = useState<Menu | null>(null)
+  /** Filtre par dossier (clé du dossier → texte cherché dans « schéma.nom ») */
+  const [filters, setFilters] = useState<Record<string, string>>({})
+  /** Dossier dont le filtre est en cours de saisie */
+  const [editingFilter, setEditingFilter] = useState<string | null>(null)
+
   const selectedKey = useExplorerStore((s) => s.selection?.key ?? null)
   const select = useExplorerStore((s) => s.select)
 
-  /** Props d'une ligne sélectionnable : le clic la sélectionne (base héritée par Ctrl+N). */
-  const rowSel = (key: string, connectionId: string, database: string | null) => ({
-    'data-selected': key === selectedKey || undefined,
-    onClick: () => select({ key, connectionId, database })
-  })
+  // Actualisation par nœud : remplie pendant le rendu, appelée par F5 / le menu.
+  const refreshers = useRef<Record<string, () => void>>({})
+  refreshers.current = {}
 
   // Purge des caches d'arbre pour les connexions fermées (évite une fuite
   // mémoire d'état sur les cycles connexion/déconnexion).
@@ -104,28 +151,35 @@ export default function ObjectExplorer({
     })
   }, [])
 
-  // ─── Chargements paresseux ─────────────────────────────────────────────────
-  const loadDatabases = useCallback(async (conn: OpenConnection) => {
-    if (databases[conn.id]) return
-    setDatabases((p) => ({ ...p, [conn.id]: 'loading' }))
-    try {
-      const dbs = await window.gtrace.listDatabases(conn.ref)
-      setDatabases((p) => ({ ...p, [conn.id]: dbs }))
-      setError(null)
-    } catch (e) {
-      setDatabases((p) => {
-        const n = { ...p }
-        delete n[conn.id]
-        return n
-      })
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [databases])
+  const expand = useCallback((key: string) => {
+    setExpanded((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
+  }, [])
+
+  // ─── Chargements paresseux (force = actualiser) ────────────────────────────
+  const loadDatabases = useCallback(
+    async (conn: OpenConnection, force = false) => {
+      if (databases[conn.id] && !force) return
+      setDatabases((p) => ({ ...p, [conn.id]: 'loading' }))
+      try {
+        const dbs = await window.gtrace.listDatabases(conn.ref)
+        setDatabases((p) => ({ ...p, [conn.id]: dbs }))
+        setError(null)
+      } catch (e) {
+        setDatabases((p) => {
+          const n = { ...p }
+          delete n[conn.id]
+          return n
+        })
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [databases]
+  )
 
   const loadObjects = useCallback(
-    async (conn: OpenConnection, db: string) => {
+    async (conn: OpenConnection, db: string, force = false) => {
       const key = `${conn.id}/${db}`
-      if (objects[key]) return
+      if (objects[key] && !force) return
       setObjects((p) => ({ ...p, [key]: 'loading' }))
       try {
         const objs = await window.gtrace.listObjects(refFor(conn, db))
@@ -143,10 +197,22 @@ export default function ObjectExplorer({
     [objects]
   )
 
-  const loadColumns = useCallback(
-    async (conn: OpenConnection, db: string, objectId: number) => {
+  const fetchColumns = useCallback(
+    async (conn: OpenConnection, db: string, objectId: number): Promise<ColumnInfo[]> => {
       const key = `${conn.id}/${db}/${objectId}`
-      if (columns[key]) return
+      const cached = columns[key]
+      if (Array.isArray(cached)) return cached
+      const cols = await window.gtrace.listColumns(refFor(conn, db), objectId)
+      setColumns((p) => ({ ...p, [key]: cols }))
+      return cols
+    },
+    [columns]
+  )
+
+  const loadColumns = useCallback(
+    async (conn: OpenConnection, db: string, objectId: number, force = false) => {
+      const key = `${conn.id}/${db}/${objectId}`
+      if (columns[key] && !force) return
       setColumns((p) => ({ ...p, [key]: 'loading' }))
       try {
         const cols = await window.gtrace.listColumns(refFor(conn, db), objectId)
@@ -163,18 +229,39 @@ export default function ObjectExplorer({
     [columns]
   )
 
-  // ─── Actions (SSMS) ────────────────────────────────────────────────────────
+  /** Vide les colonnes en cache sous un préfixe (base ou serveur actualisé). */
+  const dropColumns = useCallback((prefix: string) => {
+    setColumns((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !k.startsWith(prefix))))
+  }, [])
+
+  // F5 quand l'explorateur a le focus : actualise le nœud sélectionné.
+  const refreshTick = useExplorerStore((s) => s.refreshTick)
+  useEffect(() => {
+    if (refreshTick === 0) return
+    const key = useExplorerStore.getState().selection?.key
+    if (key) refreshers.current[key]?.()
+  }, [refreshTick])
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+  const fail = (e: unknown): void => setError(e instanceof Error ? e.message : String(e))
+
   const selectTop = useCallback(
-    (conn: OpenConnection, db: string, o: DbObjectInfo) => {
-      onOpenScript({
-        title: `SELECT ${o.name}`,
-        sql: `SELECT TOP (1000) *\nFROM ${qualify(o.schema, o.name)};`,
-        connectionId: conn.id,
-        database: db,
-        analyze: false
-      })
+    async (conn: OpenConnection, db: string, o: DbObjectInfo) => {
+      try {
+        const cols = await fetchColumns(conn, db, o.objectId)
+        onOpenScript({
+          title: `SELECT ${o.name}`,
+          sql: selectTopScript(db, o.schema, o.name, cols),
+          connectionId: conn.id,
+          database: db,
+          analyze: false,
+          execute: true
+        })
+      } catch (e) {
+        fail(e)
+      }
     },
-    [onOpenScript]
+    [fetchColumns, onOpenScript]
   )
 
   const openSource = useCallback(
@@ -190,11 +277,117 @@ export default function ObjectExplorer({
         })
         setError(null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        fail(e)
       }
     },
     [onOpenScript]
   )
+
+  /** Script généré vers un nouvel onglet ou le presse-papiers (les deux cibles SSMS). */
+  const scriptTargets = (
+    conn: OpenConnection,
+    db: string,
+    title: string,
+    build: () => Promise<string>
+  ): MenuItem[] => [
+    {
+      label: "Nouvelle fenêtre d'éditeur de requête",
+      disabled: locked,
+      onClick: () =>
+        void build()
+          .then((sql) =>
+            onOpenScript({ title, sql, connectionId: conn.id, database: db, analyze: false })
+          )
+          .catch(fail)
+    },
+    {
+      label: 'Presse-papiers',
+      onClick: () =>
+        void build()
+          .then((sql) => copyText(sql))
+          .then(() => onNotice('Script copié dans le presse-papiers.'))
+          .catch(fail)
+    }
+  ]
+
+  const definition = async (conn: OpenConnection, db: string, o: DbObjectInfo): Promise<string> =>
+    (await window.gtrace.loadProc(refFor(conn, db), o.objectId)).definition
+
+  const objectMenu = (conn: OpenConnection, db: string, o: DbObjectInfo, kind: ObjKind): MenuItem[] => {
+    const cols = (): Promise<ColumnInfo[]> => fetchColumns(conn, db, o.objectId)
+    const t = (verb: string): string => `${verb} ${o.name}`
+    const copyName: MenuItem = {
+      label: 'Copier le nom',
+      onClick: () => void copyText(qualify(o.schema, o.name)).then(() => onNotice('Nom copié.'))
+    }
+    if (kind === 'tables' || kind === 'views') {
+      const scripts: MenuItem[] =
+        kind === 'tables'
+          ? [
+              { label: 'SELECT vers', children: scriptTargets(conn, db, t('SELECT'), async () => selectScript(db, o.schema, o.name, await cols())) },
+              { label: 'INSERT vers', children: scriptTargets(conn, db, t('INSERT'), async () => insertScript(db, o.schema, o.name, await cols())) },
+              { label: 'UPDATE vers', children: scriptTargets(conn, db, t('UPDATE'), async () => updateScript(db, o.schema, o.name, await cols())) },
+              { label: 'DELETE vers', children: scriptTargets(conn, db, t('DELETE'), async () => deleteScript(db, o.schema, o.name)) }
+            ]
+          : [
+              { label: 'CREATE vers', children: scriptTargets(conn, db, t('CREATE'), async () => createScript(db, await definition(conn, db, o))) },
+              { label: 'ALTER vers', children: scriptTargets(conn, db, t('ALTER'), async () => alterScript(db, await definition(conn, db, o))) },
+              { label: 'SELECT vers', children: scriptTargets(conn, db, t('SELECT'), async () => selectScript(db, o.schema, o.name, await cols())) }
+            ]
+      return [
+        { label: 'Sélectionner les 1000 premières lignes', disabled: locked, onClick: () => void selectTop(conn, db, o) },
+        'sep',
+        { label: `Générer un script ${kind === 'tables' ? 'de la table' : 'de la vue'} en tant que`, children: scripts },
+        'sep',
+        copyName
+      ]
+    }
+    const moduleScripts: MenuItem[] = [
+      { label: 'CREATE vers', children: scriptTargets(conn, db, t('CREATE'), async () => createScript(db, await definition(conn, db, o))) },
+      { label: 'ALTER vers', children: scriptTargets(conn, db, t('ALTER'), async () => alterScript(db, await definition(conn, db, o))) }
+    ]
+    if (kind === 'procedures') {
+      moduleScripts.push({
+        label: 'EXECUTE vers',
+        children: scriptTargets(conn, db, t('EXEC'), async () => {
+          const def = await definition(conn, db, o)
+          const params = (await window.gtrace.instrument(def)).parameters
+          return executeScript(db, o.schema, o.name, params)
+        })
+      })
+      return [
+        { label: 'Déboguer', bold: true, disabled: locked, onClick: () => void openSource(conn, db, o, true) },
+        { label: 'Voir le code', disabled: locked, onClick: () => void openSource(conn, db, o, false) },
+        'sep',
+        { label: 'Générer un script de la procédure stockée en tant que', children: moduleScripts },
+        'sep',
+        copyName
+      ]
+    }
+    return [
+      { label: 'Voir le code', bold: true, disabled: locked, onClick: () => void openSource(conn, db, o, false) },
+      'sep',
+      { label: 'Générer un script de la fonction en tant que', children: moduleScripts },
+      'sep',
+      copyName
+    ]
+  }
+
+  /** Clic droit : sélectionne le nœud puis ouvre son menu (comme SSMS). */
+  const contextMenu =
+    (key: string, connectionId: string, database: string | null, items: () => MenuItem[]) =>
+    (e: MouseEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      select({ key, connectionId, database })
+      setMenu({ x: e.clientX, y: e.clientY, items: items() })
+    }
+
+  /** Props d'une ligne sélectionnable : le clic la sélectionne (base héritée par Ctrl+N). */
+  const rowSel = (key: string, connectionId: string, database: string | null) => ({
+    'data-selected': key === selectedKey || undefined,
+    onClick: () => select({ key, connectionId, database })
+  })
 
   // ─── Rendu de l'arbre (récursif, aplati en lignes indentées) ───────────────
   const renderColumns = (conn: OpenConnection, db: string, o: DbObjectInfo): JSX.Element[] => {
@@ -203,22 +396,47 @@ export default function ObjectExplorer({
     const cols = columns[key]
     if (cols === 'loading') return [<div key={`${key}-l`} className="tree-loading" style={indent(5)}>chargement…</div>]
     if (!Array.isArray(cols)) return []
-    return cols.map((c) => (
+    const colsKey = `${key}/__cols__`
+    return [
+      // Le dossier « Colonnes » se glisse vers l'éditeur : liste des colonnes.
       <div
-        key={`${key}-${c.name}`}
-        className="tree-row tree-leaf"
+        key={colsKey}
+        className="tree-row"
         style={indent(5)}
-        title={c.dataType}
-        {...rowSel(`${key}/${c.name}`, conn.id, db)}
+        title="Glisser vers l'éditeur pour insérer la liste des colonnes"
+        {...rowSel(colsKey, conn.id, db)}
+        {...dragText(cols.map((c) => c.name).join(', '))}
+        onContextMenu={contextMenu(colsKey, conn.id, db, () => [
+          {
+            label: 'Copier la liste des colonnes',
+            onClick: () => void copyText(cols.map((c) => c.name).join(', ')).then(() => onNotice('Colonnes copiées.'))
+          }
+        ])}
       >
-        <span className="tree-icon">{c.isPrimaryKey ? '🔑' : '▪'}</span>
-        <span className="tree-label">{c.name}</span>
-        <span className="tree-meta">
-          {c.dataType}
-          {c.isNullable ? ' · null' : ''}
-        </span>
-      </div>
-    ))
+        <span className="tree-twisty" />
+        <span className="tree-icon">📁</span>
+        <span className="tree-label tree-group">Colonnes</span>
+      </div>,
+      ...cols.map((c) => {
+        const ck = `${key}/${c.name}`
+        return (
+          <div
+            key={ck}
+            className="tree-row tree-leaf"
+            style={indent(6)}
+            title={columnLabel(c)}
+            {...rowSel(ck, conn.id, db)}
+            {...dragText(c.name)}
+            onContextMenu={contextMenu(ck, conn.id, db, () => [
+              { label: 'Copier le nom', onClick: () => void copyText(c.name).then(() => onNotice('Nom copié.')) }
+            ])}
+          >
+            <span className="tree-icon">{c.isPrimaryKey ? '🔑' : '▪'}</span>
+            <span className="tree-label">{columnLabel(c)}</span>
+          </div>
+        )
+      })
+    ]
   }
 
   const renderObject = (
@@ -230,14 +448,23 @@ export default function ObjectExplorer({
     const hasColumns = kind === 'tables' || kind === 'views'
     const key = `${conn.id}/${db}/${o.objectId}`
     const label = `${o.schema}.${o.name}`
+    const toggleCols = (): void => toggle(key, () => void loadColumns(conn, db, o.objectId))
+    if (hasColumns) refreshers.current[key] = () => void loadColumns(conn, db, o.objectId, true)
     return (
       <div key={key}>
-        <div className="tree-row" style={indent(4)} {...rowSel(key, conn.id, db)}>
+        <div
+          className="tree-row"
+          style={indent(4)}
+          {...rowSel(key, conn.id, db)}
+          {...dragText(qualify(o.schema, o.name))}
+          onDoubleClick={() => {
+            if (hasColumns) toggleCols()
+            else if (!locked) void openSource(conn, db, o, kind === 'procedures')
+          }}
+          onContextMenu={contextMenu(key, conn.id, db, () => objectMenu(conn, db, o, kind))}
+        >
           {hasColumns ? (
-            <button
-              className="tree-twisty"
-              onClick={() => toggle(key, () => void loadColumns(conn, db, o.objectId))}
-            >
+            <button className="tree-twisty" onClick={toggleCols}>
               {isOpen(key) ? '▾' : '▸'}
             </button>
           ) : (
@@ -249,27 +476,6 @@ export default function ObjectExplorer({
           <span className="tree-label" title={label}>
             {label}
           </span>
-          <span className="tree-actions">
-            {hasColumns ? (
-              <button
-                className="tree-action"
-                title="SELECT TOP 1000 dans un nouvel onglet"
-                onClick={() => selectTop(conn, db, o)}
-                disabled={locked}
-              >
-                ▶
-              </button>
-            ) : (
-              <button
-                className="tree-action"
-                title={kind === 'procedures' ? 'Charger et analyser' : 'Voir la définition'}
-                onClick={() => void openSource(conn, db, o, kind === 'procedures')}
-                disabled={locked}
-              >
-                {kind === 'procedures' ? '🐞' : '⧉'}
-              </button>
-            )}
-          </span>
         </div>
         {hasColumns && renderColumns(conn, db, o)}
       </div>
@@ -280,34 +486,92 @@ export default function ObjectExplorer({
     const dbKey = `${conn.id}/${db}`
     const folderKey = `${dbKey}/${kind}`
     const objs = objects[dbKey]
-    const list = objs && objs !== 'loading' ? objs[kind] : []
+    const all = objs && objs !== 'loading' ? objs[kind] : []
+    const filter = filters[folderKey]?.trim().toLowerCase() ?? ''
+    const list = filter ? all.filter((o) => `${o.schema}.${o.name}`.toLowerCase().includes(filter)) : all
+    const startFilter = (): void => {
+      expand(folderKey)
+      setEditingFilter(folderKey)
+    }
+    const clearFilter = (): void => {
+      setFilters((p) => {
+        const n = { ...p }
+        delete n[folderKey]
+        return n
+      })
+      setEditingFilter(null)
+    }
+    refreshers.current[folderKey] = () => {
+      dropColumns(`${dbKey}/`)
+      void loadObjects(conn, db, true)
+    }
     return (
       <div key={folderKey}>
-        <div className="tree-row" style={indent(3)} {...rowSel(folderKey, conn.id, db)}>
+        <div
+          className="tree-row"
+          style={indent(3)}
+          {...rowSel(folderKey, conn.id, db)}
+          onDoubleClick={() => toggle(folderKey)}
+          onContextMenu={contextMenu(folderKey, conn.id, db, () => [
+            { label: 'Filtrer…', onClick: startFilter },
+            { label: 'Supprimer le filtre', disabled: !filters[folderKey], onClick: clearFilter },
+            'sep',
+            { label: 'Actualiser', onClick: () => refreshers.current[folderKey]?.() }
+          ])}
+        >
           <button className="tree-twisty" onClick={() => toggle(folderKey)}>
             {isOpen(folderKey) ? '▾' : '▸'}
           </button>
-          <span className="tree-icon">{icon}</span>
-          <span className="tree-label">{label}</span>
-          <span className="tree-meta">{objs === 'loading' ? '…' : list.length}</span>
+          <span className="tree-icon">{filter ? '⏷' : icon}</span>
+          <span className="tree-label">
+            {label}
+            {filter ? ' (filtré)' : ''}
+          </span>
+          <span className="tree-meta">
+            {objs === 'loading' ? '…' : filter ? `${list.length}/${all.length}` : all.length}
+          </span>
         </div>
-        {isOpen(folderKey) &&
-          objs !== 'loading' &&
-          list.map((o) => renderObject(conn, db, o, kind))}
+        {editingFilter === folderKey && (
+          <div className="tree-filter" style={indent(4)}>
+            <input
+              autoFocus
+              placeholder="Le nom contient…"
+              value={filters[folderKey] ?? ''}
+              onChange={(e) => setFilters((p) => ({ ...p, [folderKey]: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setEditingFilter(null)
+                if (e.key === 'Escape') clearFilter()
+              }}
+              onBlur={() => setEditingFilter(null)}
+            />
+          </div>
+        )}
+        {isOpen(folderKey) && objs !== 'loading' && list.map((o) => renderObject(conn, db, o, kind))}
       </div>
     )
   }
 
   const renderDatabase = (conn: OpenConnection, db: DatabaseInfo): JSX.Element => {
     const dbKey = `${conn.id}/${db.name}`
+    const toggleDb = (): void => toggle(dbKey, () => void loadObjects(conn, db.name))
+    refreshers.current[dbKey] = () => {
+      dropColumns(`${dbKey}/`)
+      void loadObjects(conn, db.name, true)
+    }
     return (
       <div key={dbKey}>
-        <div className="tree-row" style={indent(2)} {...rowSel(dbKey, conn.id, db.name)}>
-          <button
-            className="tree-twisty"
-            disabled={!db.online}
-            onClick={() => toggle(dbKey, () => void loadObjects(conn, db.name))}
-          >
+        <div
+          className="tree-row"
+          style={indent(2)}
+          {...rowSel(dbKey, conn.id, db.name)}
+          onDoubleClick={() => db.online && toggleDb()}
+          onContextMenu={contextMenu(dbKey, conn.id, db.name, () => [
+            { label: 'Nouvelle requête', bold: true, disabled: locked, onClick: () => onNewQuery(conn.id, db.name) },
+            'sep',
+            { label: 'Actualiser', disabled: !db.online, onClick: () => refreshers.current[dbKey]?.() }
+          ])}
+        >
+          <button className="tree-twisty" disabled={!db.online} onClick={toggleDb}>
             {isOpen(dbKey) ? '▾' : '▸'}
           </button>
           <span className="tree-icon">🗄</span>
@@ -333,10 +597,29 @@ export default function ObjectExplorer({
     const user = dbs && dbs !== 'loading' ? dbs.filter((d) => !d.system) : []
     const system = dbs && dbs !== 'loading' ? dbs.filter((d) => d.system) : []
     const sysKey = `${conn.id}/__system__`
+    const toggleServer = (): void => toggle(conn.id, () => void loadDatabases(conn))
+    refreshers.current[conn.id] = () => {
+      dropColumns(`${conn.id}/`)
+      setObjects((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !k.startsWith(`${conn.id}/`))))
+      void loadDatabases(conn, true)
+    }
     return (
       <div key={conn.id} className="tree-server">
-        <div className="tree-row tree-root" style={indent(0)} {...rowSel(conn.id, conn.id, null)}>
-          <button className="tree-twisty" onClick={() => toggle(conn.id, () => void loadDatabases(conn))}>
+        <div
+          className="tree-row tree-root"
+          style={indent(0)}
+          {...rowSel(conn.id, conn.id, null)}
+          onDoubleClick={toggleServer}
+          onContextMenu={contextMenu(conn.id, conn.id, null, () => [
+            { label: 'Nouvelle requête', bold: true, disabled: locked, onClick: () => onNewQuery(conn.id, null) },
+            'sep',
+            { label: 'Connecter…', onClick: onConnect },
+            { label: 'Déconnexion', disabled: locked, onClick: () => onDisconnect(conn.id) },
+            'sep',
+            { label: 'Actualiser', onClick: () => refreshers.current[conn.id]?.() }
+          ])}
+        >
+          <button className="tree-twisty" onClick={toggleServer}>
             {isOpen(conn.id) ? '▾' : '▸'}
           </button>
           <span className="tree-icon">{conn.production ? '⚠' : '🖥'}</span>
@@ -367,7 +650,7 @@ export default function ObjectExplorer({
             {user.map((d) => renderDatabase(conn, d))}
             {system.length > 0 && (
               <div key={sysKey}>
-                <div className="tree-row" style={indent(1)}>
+                <div className="tree-row" style={indent(1)} onDoubleClick={() => toggle(sysKey)}>
                   <button className="tree-twisty" onClick={() => toggle(sysKey)}>
                     {isOpen(sysKey) ? '▾' : '▸'}
                   </button>
@@ -387,6 +670,16 @@ export default function ObjectExplorer({
     <div className="object-explorer">
       <div className="explorer-toolbar">
         <span className="explorer-title">Explorateur d&apos;objets</span>
+        <button
+          className="btn btn-sm btn-icon"
+          onClick={() => {
+            const key = useExplorerStore.getState().selection?.key
+            if (key) refreshers.current[key]?.()
+          }}
+          title="Actualiser l'élément sélectionné (F5 quand l'explorateur a le focus)"
+        >
+          ⟳
+        </button>
         <button className="btn btn-sm btn-primary" onClick={onConnect} title="Se connecter à un serveur">
           🔌 Connecter
         </button>
@@ -401,6 +694,7 @@ export default function ObjectExplorer({
           connections.map(renderServer)
         )}
       </div>
+      {menu && <TreeMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }

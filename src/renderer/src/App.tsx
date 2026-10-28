@@ -992,9 +992,26 @@ export default function App(): JSX.Element {
       useEditorStore.getState().openVirtual(s.title, s.sql, s.database, s.connectionId)
       resetDerived()
       if (s.analyze) void analyzeText(s.sql)
+      // « 1000 premières lignes » : exécuté dès que l'onglet est actif (voir plus bas).
+      if (s.execute) setPendingRun(useEditorStore.getState().activeId)
     },
     [locked, analyzeText, resetDerived]
   )
+
+  /** « Nouvelle requête » du clic droit : onglet vierge connecté à ce serveur / cette base. */
+  const onNewQuery = useCallback(
+    (connectionId: string, database: string | null) => {
+      if (locked) return
+      const st = useEditorStore.getState()
+      st.newTab()
+      st.patchActive({ connectionId, database })
+      resetDerived()
+    },
+    [locked, resetDerived]
+  )
+
+  /** Onglet à exécuter dès qu'il est actif et connecté (script généré + exécuté). */
+  const [pendingRun, setPendingRun] = useState<string | null>(null)
 
   const execute = useCallback(async () => {
     if (!activeRef) {
@@ -1148,6 +1165,12 @@ export default function App(): JSX.Element {
     }
   }, [activeRef, getExecutionSql, compatLevel, paramValues, timeoutMin, confirmProduction])
 
+  useEffect(() => {
+    if (!pendingRun || pendingRun !== activeId || !activeRef || busy || locked) return
+    setPendingRun(null)
+    void execute()
+  }, [pendingRun, activeId, activeRef, busy, locked, execute])
+
   // F5 / Ctrl+Entrée : exécuter (raccourcis SSMS). Ignoré si une session tourne.
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
@@ -1157,6 +1180,16 @@ export default function App(): JSX.Element {
         e.preventDefault()
         e.stopPropagation()
         if (!busy && !locked) void analyze()
+      } else if (
+        e.key === 'F5' &&
+        !e.shiftKey &&
+        !e.altKey &&
+        useExplorerStore.getState().focusArea === 'explorer'
+      ) {
+        // F5 dans l'explorateur : actualiser le nœud sélectionné (comme SSMS).
+        e.preventDefault()
+        e.stopPropagation()
+        useExplorerStore.getState().requestRefresh()
       } else if (
         (e.key === 'F5' && !e.shiftKey && !e.altKey) ||
         (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'Enter' || k === 'e'))
@@ -1629,6 +1662,8 @@ export default function App(): JSX.Element {
                 onOpenScript={onOpenScript}
                 onConnect={() => setShowConnect(true)}
                 onDisconnect={onDisconnect}
+                onNewQuery={onNewQuery}
+                onNotice={setNotice}
                 locked={locked}
               />
               <HistoryPanel

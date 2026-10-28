@@ -24,6 +24,9 @@ interface ExplorerState {
   setFocusArea: (area: 'explorer' | 'editor') => void
   /** Oublie la sélection d'une connexion fermée. */
   forget: (connectionId: string) => void
+  /** Compteur d'actualisation : F5 quand l'explorateur a le focus (comme SSMS). */
+  refreshTick: number
+  requestRefresh: () => void
 }
 
 export const useExplorerStore = create<ExplorerState>((set) => ({
@@ -31,6 +34,8 @@ export const useExplorerStore = create<ExplorerState>((set) => ({
   focusArea: 'editor',
   select: (selection) => set({ selection }),
   setFocusArea: (focusArea) => set({ focusArea }),
+  refreshTick: 0,
+  requestRefresh: () => set((s) => ({ refreshTick: s.refreshTick + 1 })),
   forget: (connectionId) =>
     set((s) => (s.selection?.connectionId === connectionId ? { selection: null } : s))
 }))

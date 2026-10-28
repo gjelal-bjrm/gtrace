@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { copyText } from '../../lib/clipboard'
 
 /**
  * Grille de données lisible et interactive.
@@ -56,29 +57,6 @@ function csvEscape(s: string): string {
 
 function htmlEscape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-async function copyText(text: string): Promise<void> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-      return
-    }
-  } catch {
-    /* repli ci-dessous */
-  }
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.style.position = 'fixed'
-  ta.style.opacity = '0'
-  document.body.appendChild(ta)
-  ta.select()
-  try {
-    document.execCommand('copy')
-  } catch {
-    /* ignore */
-  }
-  ta.remove()
 }
 
 function download(filename: string, content: string, mime: string): void {

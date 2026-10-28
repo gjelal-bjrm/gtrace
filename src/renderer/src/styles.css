@@ -2447,3 +2447,53 @@ th {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ─── Lot 4 : explorateur d'objets façon SSMS ───────────────────────────── */
+
+.tree-menu {
+  max-width: 340px;
+}
+
+.ctx-entry {
+  position: relative;
+}
+
+.ctx-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ctx-bold {
+  font-weight: 700;
+}
+
+.ctx-arrow {
+  float: right;
+  margin-left: 14px;
+  color: var(--text-dim);
+}
+
+/* Sous-menu : s'ouvre à droite de l'entrée survolée. */
+.ctx-menu.ctx-submenu {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: -5px;
+  max-width: 300px;
+  white-space: nowrap;
+}
+
+.tree-filter {
+  padding-top: 2px;
+  padding-bottom: 4px;
+  padding-right: 8px;
+}
+
+.tree-filter input {
+  width: 100%;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.tree-row[draggable='true'] {
+  cursor: default;
+}
