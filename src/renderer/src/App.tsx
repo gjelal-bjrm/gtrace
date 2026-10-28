@@ -264,7 +264,12 @@ export default function App(): JSX.Element {
   const [explorerWidth, setExplorerWidth] = useState(() => loadSize('gtrace.explorerW', 288, 190, 640))
   /** Hauteur du panneau de résultats (en bas, disposition SSMS). */
   const [resultsHeight, setResultsHeight] = useState(() => loadSize('gtrace.resultsH', 300, 140, 900))
-  const [timelineHeight, setTimelineHeight] = useState(() => loadSize('gtrace.timelineH', 132, 96, 480))
+  /** Hauteur du Déroulé quand son journal est affiché (replié, il prend sa hauteur naturelle). */
+  const [timelineHeight, setTimelineHeight] = useState(() => loadSize('gtrace.derouleH', 320, 220, 640))
+  const [journalOpen, setJournalOpen] = useState(() => localStorage.getItem('gtrace.deroule.journal') !== '0')
+  useEffect(() => {
+    localStorage.setItem('gtrace.deroule.journal', journalOpen ? '1' : '0')
+  }, [journalOpen])
   useEffect(() => {
     localStorage.setItem('gtrace.explorerW', String(explorerWidth))
   }, [explorerWidth])
@@ -272,7 +277,7 @@ export default function App(): JSX.Element {
     localStorage.setItem('gtrace.resultsH', String(resultsHeight))
   }, [resultsHeight])
   useEffect(() => {
-    localStorage.setItem('gtrace.timelineH', String(timelineHeight))
+    localStorage.setItem('gtrace.derouleH', String(timelineHeight))
   }, [timelineHeight])
   const [session, setSession] = useState<SessionState | null>(null)
   // Lu par les raccourcis clavier (F5 = Continuer, F10 = Pas à pas pendant une pause).
@@ -425,7 +430,12 @@ export default function App(): JSX.Element {
         paramValues: paramValuesRef.current,
         run
       })
-      .then(() => setHistoryVersion((v) => v + 1))
+      .then((summary) => {
+        // Les signets posés sur cette exécution seront enregistrés avec elle.
+        const replay = useReplayStore.getState()
+        if (replay.run === run) replay.attachHistory(summary.id)
+        setHistoryVersion((v) => v + 1)
+      })
       .catch(() => undefined)
   }, [])
 
@@ -654,7 +664,7 @@ export default function App(): JSX.Element {
       const store = useReplayStore.getState()
       switch (event.type) {
         case 'started':
-          store.beginLive(event.sessionId, event.instrument)
+          store.beginLive(event.sessionId, event.instrument, execSqlRef.current ?? '')
           setInstr(event.instrument)
           setSession({ id: event.sessionId, status: 'running', paused: null })
           break
@@ -1205,7 +1215,7 @@ export default function App(): JSX.Element {
           readOnlyWhitelist: parsedRoWhitelist
         })
         setInstr(outcome.instrument)
-        setRun(outcome)
+        setRun(outcome, { source: execSql })
         setRunFinishedAt(new Date())
         // Onglet le plus utile, comme SSMS : une erreur montre les Messages ;
         // un simple SELECT, les Résultats ; une proc qui écrit des variables,
@@ -1382,7 +1392,7 @@ export default function App(): JSX.Element {
       if (locked) return
       useEditorStore.getState().openVirtual(entry.title, entry.sql)
       setInstr(entry.run.instrument)
-      setRun(entry.run)
+      setRun(entry.run, { source: entry.sql, bookmarks: entry.bookmarks ?? {}, historyId: entry.id })
       setXeResult(null)
       setError(null)
       setTab('variables')
@@ -1608,7 +1618,8 @@ export default function App(): JSX.Element {
   const resetLayout = (): void => {
     setExplorerWidth(288)
     setResultsHeight(300)
-    setTimelineHeight(132)
+    setTimelineHeight(320)
+    setJournalOpen(true)
     setShowExplorer(true)
     setResultsHidden(false)
     setFocusMode(false)
@@ -2172,12 +2183,18 @@ export default function App(): JSX.Element {
             </div>
           </section>
 
-          {/* Pas de chronologie vide (pause avant la première instruction). */}
+          {/* Pas de Déroulé vide (pause avant la première instruction). Journal
+              replié : le panneau prend sa hauteur naturelle, sans poignée. */}
           {run && run.steps.length > 0 && (
             <>
-              <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 96, 480))} />
-              <div className="timeline-container" style={{ height: timelineHeight }}>
-                <Timeline />
+              {journalOpen && (
+                <Splitter axis="y" onDrag={(d) => setTimelineHeight((h) => clamp(h - d, 220, 640))} />
+              )}
+              <div
+                className={`timeline-container${journalOpen ? '' : ' collapsed'}`}
+                style={journalOpen ? { height: timelineHeight } : undefined}
+              >
+                <Timeline journalOpen={journalOpen} onToggleJournal={() => setJournalOpen((o) => !o)} />
               </div>
             </>
           )}

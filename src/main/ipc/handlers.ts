@@ -251,4 +251,7 @@ export function registerIpcHandlers(
   ipcMain.handle('history:list', () => history.list())
   ipcMain.handle('history:load', (_event, id: string) => history.load(id))
   ipcMain.handle('history:delete', (_event, id: string) => history.delete(id))
+  ipcMain.handle('history:setBookmarks', (_event, id: string, bookmarks: Record<number, string>) =>
+    history.setBookmarks(id, bookmarks)
+  )
 }

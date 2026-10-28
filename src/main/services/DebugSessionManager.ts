@@ -119,7 +119,7 @@ export class DebugSessionManager {
       pool,
       request,
       instrument,
-      collected: { recordsets: [], errors: [] },
+      collected: { recordsets: [], errors: [], errorAt: [] },
       spid,
       stepCount: 0,
       currentSeq: 0,
@@ -155,6 +155,7 @@ export class DebugSessionManager {
         state: e.state
       }
       session.collected.errors.push(stepError)
+      session.collected.errorAt.push(session.collected.recordsets.length)
       emit({ type: 'error', sessionId, message: e.message })
     })
     request.on('done', () => {

@@ -878,37 +878,6 @@ th {
   gap: 12px;
 }
 
-/* ─── Timeline ───────────────────────────────────────────────────────────── */
-
-.steps-strip {
-  display: flex;
-  align-items: flex-start;
-  gap: 3px;
-  overflow-x: auto;
-  /* Marge suffisante : overflow-x:auto force overflow-y:auto, qui rognerait
-     sinon le liseré de sélection des blocs. */
-  padding: 4px 2px 8px;
-}
-
-.step-block {
-  width: 16px;
-  height: 24px;
-  min-width: 11px;
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 1;
-}
-
-.step-block:hover {
-  filter: brightness(1.4);
-}
-
-.step-block.selected {
-  /* Liseré INTÉRIEUR (jamais rogné par l'overflow de la piste, à la différence
-     d'un outline extérieur). */
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-
 /* ─── Aides à la navigation dans les longues procédures ──────────────────── */
 
 .breadcrumb {
@@ -1403,43 +1372,6 @@ th {
   gap: 12px;
   flex-wrap: wrap;
   padding-top: 4px;
-}
-
-/* Légende de la chronologie : sans elle, la bande colorée est illisible. */
-.timeline-legend {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  font-size: 10.5px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-/* Fenêtre étroite : la phrase d'aide se raccourcit avant le reste. */
-.legend-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.legend-scale,
-.legend-err {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.legend-scale i,
-.legend-err i {
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-}
-
-.legend-ends {
-  margin-left: 4px;
 }
 
 .help-para {

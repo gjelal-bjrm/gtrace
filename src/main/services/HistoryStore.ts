@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { HistoryEntry, HistoryEntrySummary, HistorySaveInput } from '@shared/types'
@@ -44,6 +44,27 @@ export class HistoryStore {
     const file = join(this.dir, `${sanitize(id)}.json`)
     if (!existsSync(file)) throw new Error(`Session inconnue : ${id}`)
     return JSON.parse(readFileSync(file, 'utf8')) as HistoryEntry
+  }
+
+  /**
+   * Signets du Déroulé (noms donnés aux étapes). Réécrit l'entrée via un
+   * fichier temporaire : une coupure en pleine écriture ne la corrompt pas.
+   * Entrée disparue entre-temps (purge des plus anciennes) : rien à faire.
+   */
+  setBookmarks(id: string, bookmarks: Record<number, string>): void {
+    const file = join(this.dir, `${sanitize(id)}.json`)
+    if (!existsSync(file)) return
+    const entry = JSON.parse(readFileSync(file, 'utf8')) as HistoryEntry
+    const clean: Record<number, string> = {}
+    for (const [key, name] of Object.entries(bookmarks ?? {})) {
+      const index = Number(key)
+      if (!Number.isInteger(index) || index < 0 || index >= entry.run.steps.length) continue
+      if (typeof name !== 'string' || !name.trim()) continue
+      clean[index] = name.trim().slice(0, 80)
+    }
+    entry.bookmarks = clean
+    writeFileSync(`${file}.tmp`, JSON.stringify(entry), 'utf8')
+    renameSync(`${file}.tmp`, file)
   }
 
   delete(id: string): void {

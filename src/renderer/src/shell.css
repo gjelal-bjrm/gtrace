@@ -1642,53 +1642,214 @@ button.tree-twisty:hover:not(:disabled) {
   background: var(--surface);
 }
 
-/* ─── Chronologie (propre à GTrace) ──────────────────────────────────────── */
+/* ─── Déroulé de l'exécution (propre à GTrace) ───────────────────────────── */
+
+/* Une teinte par famille d'instruction, tirée du thème (voir lib/runModel.ts). */
+:root {
+  --step-calc: color-mix(in srgb, var(--ic-table) 50%, var(--surface));
+  --step-read: var(--ic-view);
+  --step-write: var(--ic-key);
+  --step-call: var(--ic-func);
+  --step-ctrl: color-mix(in srgb, var(--ic-column) 60%, var(--surface));
+  --step-error: var(--error);
+  --step-mark: var(--marker);
+}
 
 .timeline-container {
   flex: 0 1 auto;
-  /* Plancher : garantit que transport + piste des étapes tiennent sans être rognés. */
-  min-height: 86px;
+  /* Plancher : barre de lecture, piste, filtres et quelques lignes de journal. */
+  min-height: 200px;
   overflow: hidden;
   border-top: 1px solid var(--chrome-border);
-  container: timeline / inline-size;
+  container: deroule / inline-size;
 }
 
-/* Chronologie étroite : la légende des couleurs laisse la place aux commandes. */
-@container timeline (max-width: 820px) {
-  .timeline-legend {
-    display: none;
-  }
+/* Journal replié : le panneau prend sa hauteur naturelle. */
+.timeline-container.collapsed {
+  flex-shrink: 0;
+  min-height: 0;
 }
 
-.timeline-bar {
+.deroule {
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  padding: 6px 12px 8px;
-  overflow: auto;
+  min-height: 0;
   background: var(--chrome);
+  font-size: 12px;
 }
 
-.transport {
+.timeline-container.collapsed .deroule {
+  height: auto;
+}
+
+.dr-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 10px 0 12px;
 }
 
-.timeline-title {
+.dr-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--text);
-  font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.timeline-title svg {
+.dr-title svg {
   color: var(--accent);
+}
+
+.dr-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dr-spacer {
+  flex: 1;
+}
+
+.dr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dr-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--chrome-border));
+  background: var(--accent-dim);
+}
+
+.dr-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.dr-btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Bascule Couleur : Type | Durée */
+.dr-seg {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  height: 24px;
+  overflow: hidden;
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  background: var(--bg-input);
+}
+
+.dr-seg-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-right: 1px solid var(--chrome-border);
+  color: var(--text-dim);
+}
+
+.dr-seg button {
+  padding: 0 9px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dr-seg button:hover {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+.dr-seg button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* Nommer un moment (signet) */
+.dr-naming {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dr-naming-label {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dr-naming-field {
+  position: relative;
+  display: inline-flex;
+}
+
+.dr-naming input {
+  width: 230px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.dr-naming input[aria-invalid='true'] {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px var(--error-dim);
+}
+
+.dr-naming-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 3;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--error);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Barre de lecture : boutons + « ce qui s'est passé ici » */
+.dr-transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 2px 12px;
 }
 
 .transport-buttons {
   display: inline-flex;
+  flex-shrink: 0;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--chrome-border);
@@ -1715,16 +1876,717 @@ button.tree-twisty:hover:not(:disabled) {
   color: var(--accent);
 }
 
-.step-label {
-  flex-shrink: 0;
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 11.5px;
+.dr-now {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
   white-space: nowrap;
 }
 
-.transport .spacer {
-  min-width: 12px;
+.dr-now-step {
+  flex-shrink: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dr-now-line {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.dr-now-code {
+  flex: 0 1 auto;
+  min-width: 40px;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+}
+
+.dr-effect {
+  flex: 0 1 auto;
+  min-width: 60px;
+  max-width: 45%;
+  overflow: hidden;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+.dr-effect.error {
+  background: var(--error-dim);
+  color: var(--error);
+}
+
+.dr-now-ms {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.dr-now-ms.slow {
+  color: var(--heat-3);
+  font-weight: 600;
+}
+
+/* Pastille de signet (barre de lecture et journal) */
+.dr-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--step-mark) 16%, transparent);
+  color: color-mix(in srgb, var(--step-mark) 75%, var(--text));
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Piste : repères (0-18 px), barres (20-48), suivi de variable, boucles (56-74) */
+.dr-track {
+  position: relative;
+  flex-shrink: 0;
+  height: 74px;
+  margin: 2px 14px 0;
+  outline: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.dr-track:focus-visible {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.dr-markers {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 18px;
+}
+
+.dr-marker {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+}
+
+.dr-marker.error {
+  color: var(--step-error);
+}
+
+.dr-marker.read {
+  color: var(--step-read);
+}
+
+.dr-marker.write {
+  color: color-mix(in srgb, var(--step-write) 75%, var(--text));
+}
+
+.dr-flag {
+  position: absolute;
+  top: 1px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--step-mark);
+  transform: translateX(-6px);
+  pointer-events: none;
+}
+
+.dr-flag.to-left {
+  flex-direction: row-reverse;
+  transform: translateX(calc(-100% + 6px));
+}
+
+.dr-flag-name {
+  max-width: 180px;
+  overflow: hidden;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--step-mark) 16%, var(--chrome));
+  color: color-mix(in srgb, var(--step-mark) 70%, var(--text));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-bars {
+  position: absolute;
+  top: 20px;
+  right: 0;
+  left: 0;
+  height: 28px;
+}
+
+/* Hauteur = durée de l'instruction ; couleur = famille ou durée. */
+.dr-bar {
+  position: absolute;
+  bottom: 0;
+  min-height: 3px;
+  border-radius: 2px 2px 1px 1px;
+  transition: opacity 0.15s;
+}
+
+.dr-bar.dim {
+  opacity: 0.2;
+}
+
+.dr-cat-calc {
+  background: var(--step-calc);
+}
+
+.dr-cat-read {
+  background: var(--step-read);
+}
+
+.dr-cat-write {
+  background: var(--step-write);
+}
+
+.dr-cat-call {
+  background: var(--step-call);
+}
+
+.dr-cat-ctrl {
+  background: var(--step-ctrl);
+}
+
+.dr-cat-error {
+  background: var(--step-error);
+}
+
+.dr-heat-0 {
+  background: var(--heat-0);
+}
+
+.dr-heat-1 {
+  background: var(--heat-1);
+}
+
+.dr-heat-2 {
+  background: var(--heat-2);
+}
+
+.dr-heat-3 {
+  background: var(--heat-3);
+}
+
+/* Étape qui modifie une variable suivie (couleur de la variable). */
+.dr-watch {
+  position: absolute;
+  top: calc(100% + 3px);
+  height: 3px;
+  border-radius: 2px;
+}
+
+.dr-slot {
+  position: absolute;
+  top: 17px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  pointer-events: none;
+}
+
+.dr-slot.hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.dr-playhead {
+  position: absolute;
+  top: 13px;
+  z-index: 2;
+  width: 2px;
+  height: 42px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  pointer-events: none;
+  transition: left 0.08s ease-out;
+}
+
+.dr-playhead::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 2px var(--chrome);
+}
+
+.dr-loops {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  left: 0;
+  height: 18px;
+}
+
+.dr-loop-bracket {
+  position: absolute;
+  top: 0;
+  height: 15px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text-dim) 55%, transparent);
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Info-bulle de la piste : immédiate, hors du panneau (jamais rognée). */
+.dr-tip {
+  position: fixed;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+  max-width: 420px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: #1f2430;
+  color: #f2f4f8;
+  font-size: 11.5px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+
+.dr-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.dr-tip-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #f3b58f;
+}
+
+.dr-tip-code {
+  overflow: hidden;
+  color: #d9dee8;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-tip-effect {
+  overflow: hidden;
+  color: #b9e3c9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-tip-effect.error {
+  color: #f4a99a;
+}
+
+.dr-tip-foot {
+  color: #9aa3b5;
+  font-size: 11px;
+}
+
+/* Filtres (et légende des couleurs) */
+.dr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 12px 6px;
+}
+
+.dr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dr-chip:hover {
+  background: var(--accent-dim);
+}
+
+.dr-chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.dr-chip-count {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dr-chip[aria-pressed='true'] .dr-chip-count {
+  color: inherit;
+}
+
+.dr-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.dr-heat-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dr-heat-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.dr-hint {
+  min-width: 0;
+  margin-left: auto;
+  padding-left: 12px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Journal : une ligne par étape, colonnes alignées */
+.dr-journal {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0 10px 8px;
+  overflow: hidden;
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dr-journal-head,
+.dr-row {
+  display: grid;
+  grid-template-columns: 52px 58px 80px minmax(0, 3fr) minmax(0, 2fr) 86px;
+  align-items: center;
+  column-gap: 10px;
+  padding: 0 10px 0 6px;
+  border-left: 3px solid transparent;
+}
+
+.dr-journal-head {
+  flex-shrink: 0;
+  height: 24px;
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--panel-head);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dr-journal-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  outline: none;
+}
+
+.dr-journal-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-dim);
+}
+
+.dr-journal-empty {
+  padding: 12px 14px;
+  color: var(--text-dim);
+}
+
+.dr-row {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 26px;
+  border-bottom: 1px solid color-mix(in srgb, var(--chrome-border) 45%, transparent);
+  cursor: pointer;
+}
+
+.dr-row:hover {
+  background: var(--bg-hover);
+}
+
+.dr-row.selected {
+  border-left-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.dr-c-num {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dr-c-line {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dr-badge {
+  --c: var(--step-ctrl);
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c) 26%, transparent);
+  color: color-mix(in srgb, var(--c) 60%, var(--text));
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dr-badge-calc {
+  --c: var(--step-calc);
+}
+
+.dr-badge-read {
+  --c: var(--step-read);
+}
+
+.dr-badge-write {
+  --c: var(--step-write);
+}
+
+.dr-badge-call {
+  --c: var(--step-call);
+}
+
+.dr-badge-error {
+  --c: var(--step-error);
+}
+
+.dr-c-code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dr-c-code code {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-c-effect {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-c-effect.error {
+  color: var(--error);
+}
+
+.dr-c-ms {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dr-c-ms.slow {
+  color: var(--heat-3);
+  font-weight: 600;
+}
+
+.dr-msbar {
+  display: block;
+  flex-shrink: 0;
+  height: 5px;
+  border-radius: 3px;
+}
+
+/* En-tête de boucle repliée */
+.dr-row.dr-loop {
+  grid-template-columns: 52px 58px minmax(0, 1fr) auto;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  cursor: default;
+}
+
+.dr-loop-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dr-loop-title svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.dr-loop-meta {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.dr-iter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dr-iter-label {
+  margin-right: 3px;
+  color: var(--text-dim);
+}
+
+.dr-iter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 5px;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.dr-iter-btn:hover {
+  background: var(--accent-dim);
+}
+
+.dr-iter-btn.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.dr-iter-count {
+  min-width: 70px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Exécution arrêtée par une erreur non interceptée */
+.dr-row.dr-stop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  background: var(--error-dim);
+  color: var(--error);
+  cursor: default;
+}
+
+.dr-row.dr-stop span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Menu du clic droit (piste et journal) */
+.ctx-menu.dr-menu {
+  min-width: 250px;
+}
+
+/* Panneau étroit : les phrases d'aide laissent la place aux commandes. */
+@container deroule (max-width: 980px) {
+  .dr-subtitle,
+  .dr-hint {
+    display: none;
+  }
+}
+
+@container deroule (max-width: 760px) {
+  .dr-seg-label,
+  .dr-now-line {
+    display: none;
+  }
+
+  .dr-journal-head,
+  .dr-row {
+    grid-template-columns: 44px 52px 74px minmax(0, 1fr) 70px;
+  }
+
+  .dr-journal-head > :nth-child(5),
+  .dr-row > .dr-c-effect {
+    display: none;
+  }
 }
 
 /* ─── Barre d'état de la requête (la barre jaune de SSMS) ────────────────── */
@@ -2393,7 +3255,7 @@ button.ms-version:hover {
   border-radius: 10px 10px 0 0;
 }
 
-:root[data-shell='cards'] .timeline-bar {
+:root[data-shell='cards'] .deroule {
   background: var(--panel-head);
 }
 

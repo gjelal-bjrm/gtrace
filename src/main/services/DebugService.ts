@@ -55,6 +55,8 @@ export interface RawRecordset {
 export interface Collected {
   recordsets: RawRecordset[]
   errors: StepError[]
+  /** Pour chaque erreur : nombre de recordsets déjà reçus (la situe entre deux étapes) */
+  errorAt: number[]
 }
 
 /** Construit un TraceStep depuis un resultset de trace (__GTRACE__ / __GTRACE_ERR__). */
@@ -161,6 +163,7 @@ export function executeStreaming(request: sql.Request, script: string): Promise<
     request.stream = true
     const recordsets: RawRecordset[] = []
     const errors: StepError[] = []
+    const errorAt: number[] = []
     let current: RawRecordset | null = null
 
     request.on('recordset', (columns: Record<string, unknown>) => {
@@ -184,8 +187,9 @@ export function executeStreaming(request: sql.Request, script: string): Promise<
         severity: e.class,
         state: e.state
       })
+      errorAt.push(recordsets.length)
     })
-    request.on('done', () => resolve({ recordsets, errors }))
+    request.on('done', () => resolve({ recordsets, errors, errorAt }))
 
     void request.query(script).catch(() => {
       // L'erreur est déjà collectée via l'événement 'error' ; 'done' est émis ensuite.
@@ -204,8 +208,10 @@ export function assemble(
   let pending: number[] = []
   // En-tête SNAP vu : le prochain recordset est le contenu de la table.
   let expectedSnap: { statementIndex: number; table: string } | null = null
+  /** Recordset de trace de chaque étape : situe les erreurs non interceptées. */
+  const traceAt: number[] = []
 
-  for (const rs of collected.recordsets) {
+  for (const [ri, rs] of collected.recordsets.entries()) {
     const first = rs.rows[0]
     const tag = rs.columns[0] === '_t' && first ? first['_t'] : null
 
@@ -231,6 +237,7 @@ export function assemble(
 
     if (tag === TRACE_TAG || tag === ERROR_TAG) {
       steps.push(buildStep(instrument, rs, steps.length, pending))
+      traceAt.push(ri)
       pending = []
       continue
     }
@@ -275,5 +282,15 @@ export function assemble(
       prev && curr ? Math.max(0, new Date(curr).getTime() - new Date(prev).getTime()) : null
   }
 
-  return { steps, resultsets, outputValues, errors: collected.errors, snapshots }
+  // Une erreur non interceptée précède la trace de l'instruction fautive quand
+  // l'exécution continue (division par zéro, RAISERROR…) ; si aucune trace ne
+  // la suit, l'exécution s'est arrêtée là.
+  const errors = collected.errors.map((e, j): StepError => {
+    const at = collected.errorAt[j]
+    if (at === undefined) return e
+    const k = traceAt.findIndex((ri) => ri >= at)
+    return { ...e, stepIndex: k >= 0 ? k : null }
+  })
+
+  return { steps, resultsets, outputValues, errors, snapshots }
 }

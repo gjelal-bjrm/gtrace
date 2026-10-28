@@ -87,6 +87,7 @@ export interface IpcContract {
   'history:list': () => Promise<HistoryEntrySummary[]>
   'history:load': (id: string) => Promise<HistoryEntry>
   'history:delete': (id: string) => Promise<void>
+  'history:setBookmarks': (id: string, bookmarks: Record<number, string>) => Promise<void>
   'update:check': () => Promise<void>
   'update:install': () => Promise<void>
   'update:get': () => Promise<UpdateSnapshot>
@@ -144,6 +145,8 @@ export interface GTraceApi {
   historyList: () => Promise<HistoryEntrySummary[]>
   historyLoad: (id: string) => Promise<HistoryEntry>
   historyDelete: (id: string) => Promise<void>
+  /** Signets du Déroulé, enregistrés avec l'exécution */
+  historySetBookmarks: (id: string, bookmarks: Record<number, string>) => Promise<void>
   updateCheck: () => Promise<void>
   updateInstall: () => Promise<void>
   updateGet: () => Promise<UpdateSnapshot>

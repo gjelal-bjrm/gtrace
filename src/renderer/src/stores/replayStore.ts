@@ -1,15 +1,33 @@
 import { create } from 'zustand'
 import type { DebugRunResult, InstrumentResult, TraceStep } from '@shared/types'
 
+/** Signets : numéro d'étape → nom donné par l'utilisateur. */
+export type Bookmarks = Record<number, string>
+
+interface RunContext {
+  /** SQL exécuté (mêmes numéros de ligne que l'éditeur) : extraits du Déroulé */
+  source?: string
+  bookmarks?: Bookmarks
+  /** Entrée d'historique où cette exécution est enregistrée */
+  historyId?: string | null
+}
+
 interface ReplayState {
   run: DebugRunResult | null
   currentStep: number
   /** Session interactive en cours : les steps arrivent en live */
   live: boolean
-  setRun: (run: DebugRunResult | null) => void
-  beginLive: (sessionId: string, instrument: InstrumentResult) => void
+  source: string
+  bookmarks: Bookmarks
+  historyId: string | null
+  setRun: (run: DebugRunResult | null, context?: RunContext) => void
+  beginLive: (sessionId: string, instrument: InstrumentResult, source?: string) => void
   appendStep: (step: TraceStep) => void
   endLive: (result: DebugRunResult) => void
+  /** Nomme une étape (nom vide = retire le signet) ; enregistré dans l'historique. */
+  setBookmark: (stepIndex: number, name: string) => void
+  /** L'exécution vient d'être enregistrée : ses signets la suivent désormais. */
+  attachHistory: (historyId: string) => void
   select: (index: number) => void
   next: () => void
   prev: () => void
@@ -17,15 +35,33 @@ interface ReplayState {
   last: () => void
 }
 
+function persistBookmarks(historyId: string | null, bookmarks: Bookmarks): void {
+  if (historyId) void window.gtrace.historySetBookmarks(historyId, bookmarks).catch(() => undefined)
+}
+
 export const useReplayStore = create<ReplayState>((set, get) => ({
   run: null,
   currentStep: 0,
   live: false,
-  setRun: (run) => set({ run, currentStep: 0, live: false }),
-  beginLive: (sessionId, instrument) =>
+  source: '',
+  bookmarks: {},
+  historyId: null,
+  setRun: (run, context) =>
+    set({
+      run,
+      currentStep: 0,
+      live: false,
+      source: context?.source ?? '',
+      bookmarks: context?.bookmarks ?? {},
+      historyId: context?.historyId ?? null
+    }),
+  beginLive: (sessionId, instrument, source) =>
     set({
       live: true,
       currentStep: 0,
+      source: source ?? '',
+      bookmarks: {},
+      historyId: null,
       run: {
         sessionId,
         instrument,
@@ -43,6 +79,19 @@ export const useReplayStore = create<ReplayState>((set, get) => ({
       return { run: { ...state.run, steps }, currentStep: steps.length - 1 }
     }),
   endLive: (result) => set((state) => ({ run: result, live: false, currentStep: state.currentStep })),
+  setBookmark: (stepIndex, name) => {
+    const bookmarks = { ...get().bookmarks }
+    const clean = name.trim()
+    if (clean) bookmarks[stepIndex] = clean
+    else delete bookmarks[stepIndex]
+    set({ bookmarks })
+    persistBookmarks(get().historyId, bookmarks)
+  },
+  attachHistory: (historyId) => {
+    set({ historyId })
+    // Signets posés avant l'enregistrement (session en pause, ou pendant la sauvegarde).
+    if (Object.keys(get().bookmarks).length > 0) persistBookmarks(historyId, get().bookmarks)
+  },
   select: (index) => {
     const { run } = get()
     if (run && index >= 0 && index < run.steps.length) set({ currentStep: index })

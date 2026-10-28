@@ -175,6 +175,12 @@ export interface StepError {
   line: number | null
   severity?: number
   state?: number
+  /**
+   * Erreur non interceptée : étape de l'instruction fautive (l'exécution a
+   * continué), ou null si plus rien n'a été exécuté ensuite (exécution arrêtée).
+   * Absent des exécutions enregistrées avant cette information.
+   */
+  stepIndex?: number | null
 }
 
 export interface TraceStep {
@@ -354,6 +360,8 @@ export interface HistoryEntry extends HistoryEntrySummary {
   /** Valeurs d'entrée des paramètres au lancement (diagnostic) */
   paramValues?: Record<string, string | null>
   run: DebugRunResult
+  /** Signets du Déroulé : numéro d'étape → nom donné par l'utilisateur */
+  bookmarks?: Record<number, string>
 }
 
 export interface HistorySaveInput {

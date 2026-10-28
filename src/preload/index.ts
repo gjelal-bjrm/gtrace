@@ -48,6 +48,7 @@ const api: GTraceApi = {
   historyList: () => ipcRenderer.invoke('history:list'),
   historyLoad: (id) => ipcRenderer.invoke('history:load', id),
   historyDelete: (id) => ipcRenderer.invoke('history:delete', id),
+  historySetBookmarks: (id, bookmarks) => ipcRenderer.invoke('history:setBookmarks', id, bookmarks),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateInstall: () => ipcRenderer.invoke('update:install'),
   updateGet: () => ipcRenderer.invoke('update:get'),
