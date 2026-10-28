@@ -33,7 +33,7 @@ import {
 import type { DatabaseInfo } from '@shared/types'
 import type { OpenConnection } from '../../stores/connectionsStore'
 import { editorAction, editorPaste } from '../editor/CodeEditor'
-import { ToolButton, ToolSeparator } from '../ui/ToolButton'
+import { ToolButton, ToolGroup } from '../ui/ToolButton'
 import TreeMenu, { type MenuItem } from '../connections/TreeMenu'
 
 /**
@@ -67,84 +67,92 @@ export function StandardToolbar({
 }): JSX.Element {
   return (
     <div className="toolbar" role="toolbar" aria-label="Barre d'outils standard">
-      <ToolButton
-        icon={FolderOpen}
-        label="Ouvrir un fichier"
-        shortcut="Ctrl+O"
-        disabled={locked}
-        onClick={onOpen}
-      />
-      <ToolButton icon={Save} label="Enregistrer" shortcut="Ctrl+S" onClick={onSave} />
-      <ToolButton
-        icon={SaveAll}
-        label="Enregistrer tout"
-        shortcut="Ctrl+Maj+S"
-        onClick={onSaveAll}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={FilePlus}
-        label="Nouvelle requête"
-        showLabel
-        tip="Nouvelle requête, sur la base sélectionnée dans l'explorateur ou celle de l'onglet actif"
-        shortcut="Ctrl+N"
-        disabled={locked}
-        onClick={onNew}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={Scissors}
-        label="Couper"
-        shortcut="Ctrl+X"
-        onClick={() => editorAction('editor.action.clipboardCutAction')}
-      />
-      <ToolButton
-        icon={Copy}
-        label="Copier"
-        shortcut="Ctrl+C"
-        onClick={() => editorAction('editor.action.clipboardCopyAction')}
-      />
-      <ToolButton
-        icon={ClipboardPaste}
-        label="Coller"
-        shortcut="Ctrl+V"
-        onClick={() => void editorPaste()}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={Undo2}
-        label="Annuler"
-        shortcut="Ctrl+Z"
-        onClick={() => editorAction('undo')}
-      />
-      <ToolButton
-        icon={Redo2}
-        label="Rétablir"
-        shortcut="Ctrl+Y"
-        onClick={() => editorAction('redo')}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={PanelLeft}
-        label="Explorateur d'objets"
-        shortcut="F8"
-        active={explorerVisible}
-        onClick={onToggleExplorer}
-      />
-      <ToolButton
-        icon={PanelBottom}
-        label="Volet de résultats"
-        shortcut="Ctrl+R"
-        active={resultsVisible}
-        onClick={onToggleResults}
-      />
+      <ToolGroup label="Fichiers">
+        <ToolButton
+          icon={FolderOpen}
+          label="Ouvrir un fichier"
+          shortcut="Ctrl+O"
+          disabled={locked}
+          onClick={onOpen}
+        />
+        <ToolButton icon={Save} label="Enregistrer" shortcut="Ctrl+S" onClick={onSave} />
+        <ToolButton
+          icon={SaveAll}
+          label="Enregistrer tout"
+          shortcut="Ctrl+Maj+S"
+          onClick={onSaveAll}
+        />
+      </ToolGroup>
+      <ToolGroup label="Nouvelle requête">
+        <ToolButton
+          icon={FilePlus}
+          label="Nouvelle requête"
+          showLabel
+          tip="Nouvelle requête, sur la base sélectionnée dans l'explorateur ou celle de l'onglet actif"
+          shortcut="Ctrl+N"
+          disabled={locked}
+          onClick={onNew}
+        />
+      </ToolGroup>
+      <ToolGroup label="Presse-papiers">
+        <ToolButton
+          icon={Scissors}
+          label="Couper"
+          shortcut="Ctrl+X"
+          onClick={() => editorAction('editor.action.clipboardCutAction')}
+        />
+        <ToolButton
+          icon={Copy}
+          label="Copier"
+          shortcut="Ctrl+C"
+          onClick={() => editorAction('editor.action.clipboardCopyAction')}
+        />
+        <ToolButton
+          icon={ClipboardPaste}
+          label="Coller"
+          shortcut="Ctrl+V"
+          onClick={() => void editorPaste()}
+        />
+      </ToolGroup>
+      <ToolGroup label="Annuler et rétablir">
+        <ToolButton
+          icon={Undo2}
+          label="Annuler"
+          shortcut="Ctrl+Z"
+          onClick={() => editorAction('undo')}
+        />
+        <ToolButton
+          icon={Redo2}
+          label="Rétablir"
+          shortcut="Ctrl+Y"
+          onClick={() => editorAction('redo')}
+        />
+      </ToolGroup>
+      <ToolGroup label="Affichage">
+        <ToolButton
+          icon={PanelLeft}
+          label="Explorateur d'objets"
+          shortcut="F8"
+          active={explorerVisible}
+          onClick={onToggleExplorer}
+        />
+        <ToolButton
+          icon={PanelBottom}
+          label="Volet de résultats"
+          shortcut="Ctrl+R"
+          active={resultsVisible}
+          onClick={onToggleResults}
+        />
+      </ToolGroup>
       <span className="toolbar-spacer" />
-      <ToolButton
-        icon={Palette}
-        label="Apparence : thèmes et taille du texte"
-        onClick={onAppearance}
-      />
-      <ToolButton icon={CircleHelp} label="Aide de GTrace" shortcut="F1" onClick={onHelp} />
+      <ToolGroup label="Aide">
+        <ToolButton
+          icon={Palette}
+          label="Apparence : thèmes et taille du texte"
+          onClick={onAppearance}
+        />
+        <ToolButton icon={CircleHelp} label="Aide de GTrace" shortcut="F1" onClick={onHelp} />
+      </ToolGroup>
     </div>
   )
 }
@@ -228,52 +236,53 @@ export function SqlToolbar({
 
   return (
     <div className="toolbar" role="toolbar" aria-label="Barre d'outils de l'éditeur SQL">
-      <ToolButton icon={Plug} label="Se connecter à un serveur" onClick={onConnect} />
-      <button
-        ref={chipRef}
-        type="button"
-        className={`conn-chip${activeConn ? '' : ' off'}${activeConn?.production ? ' prod' : ''}`}
-        data-tip="Connexion de l'onglet : changer de serveur"
-        aria-haspopup="menu"
-        onClick={() => {
-          const r = chipRef.current?.getBoundingClientRect()
-          if (r) setMenu({ x: r.left, y: r.bottom + 2 })
-        }}
-      >
-        <Server size={14} aria-hidden="true" />
-        <span className="conn-chip-label">{activeConn ? activeConn.label : 'Non connecté'}</span>
-        {activeConn?.production && <span className="prod-pill">PROD</span>}
-        <ChevronDown size={14} aria-hidden="true" />
-      </button>
-      <span
-        className={`select-wrap db-select${activeConn ? '' : ' off'}`}
-        data-tip="Bases de données disponibles"
-        data-shortcut="Ctrl+U"
-      >
-        <Database size={14} aria-hidden="true" />
-        <select
-          ref={dbPickerRef}
-          value={database ?? ''}
-          disabled={!activeConn || locked}
-          onChange={(e) => onPickDatabase(e.target.value)}
-          aria-label="Base de données de l'onglet"
+      <ToolGroup label="Connexion">
+        <ToolButton icon={Plug} label="Se connecter à un serveur" onClick={onConnect} />
+        <button
+          ref={chipRef}
+          type="button"
+          className={`conn-chip${activeConn ? '' : ' off'}${activeConn?.production ? ' prod' : ''}`}
+          data-tip="Connexion de l'onglet : changer de serveur"
+          aria-haspopup="menu"
+          onClick={() => {
+            const r = chipRef.current?.getBoundingClientRect()
+            if (r) setMenu({ x: r.left, y: r.bottom + 2 })
+          }}
         >
-          {!activeConn && <option value="">—</option>}
-          {/* La base courante figure toujours, même avant le chargement de la liste. */}
-          {activeConn && database && !databases?.some((d) => d.name === database) && (
-            <option value={database}>{database}</option>
-          )}
-          {databases
-            ?.filter((d) => d.online)
-            .map((d) => (
-              <option key={d.name} value={d.name}>
-                {d.name}
-              </option>
-            ))}
-        </select>
-        <ChevronDown size={14} className="select-chevron" aria-hidden="true" />
-      </span>
-      <ToolSeparator />
+          <Server size={14} aria-hidden="true" />
+          <span className="conn-chip-label">{activeConn ? activeConn.label : 'Non connecté'}</span>
+          {activeConn?.production && <span className="prod-pill">PROD</span>}
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
+        <span
+          className={`select-wrap db-select${activeConn ? '' : ' off'}`}
+          data-tip="Bases de données disponibles"
+          data-shortcut="Ctrl+U"
+        >
+          <Database size={14} aria-hidden="true" />
+          <select
+            ref={dbPickerRef}
+            value={database ?? ''}
+            disabled={!activeConn || locked}
+            onChange={(e) => onPickDatabase(e.target.value)}
+            aria-label="Base de données de l'onglet"
+          >
+            {!activeConn && <option value="">—</option>}
+            {/* La base courante figure toujours, même avant le chargement de la liste. */}
+            {activeConn && database && !databases?.some((d) => d.name === database) && (
+              <option value={database}>{database}</option>
+            )}
+            {databases
+              ?.filter((d) => d.online)
+              .map((d) => (
+                <option key={d.name} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+          </select>
+          <ChevronDown size={14} className="select-chevron" aria-hidden="true" />
+        </span>
+      </ToolGroup>
       <button
         type="button"
         className={`run-btn${running ? ' running' : ''}${canRun ? '' : ' is-disabled'}`}
@@ -289,70 +298,74 @@ export function SqlToolbar({
         )}
         <span>{runLabel}</span>
       </button>
-      <ToolButton
-        icon={Square}
-        iconFill
-        label="Arrêter"
-        tip="Arrêter le débogage ou le profilage"
-        shortcut="Alt+Pause"
-        variant="danger"
-        disabled={!canStop}
-        onClick={onStop}
-      />
-      <ToolButton
-        icon={Check}
-        label="Analyser"
-        tip="Analyser : vérifier la syntaxe sans rien exécuter"
-        shortcut="Ctrl+F5"
-        disabled={locked}
-        onClick={onAnalyze}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={ArrowDownToDot}
-        label="Pas à pas"
-        tip="Pas à pas : exécuter l'instruction suivante (session en pause)"
-        shortcut="F10"
-        disabled={!canStep}
-        onClick={onStep}
-      />
-      <ToolButton
-        icon={CircleDot}
-        label="Point d'arrêt"
-        tip="Poser / retirer un point d'arrêt sur la ligne du curseur"
-        shortcut="F9"
-        onClick={onToggleBreakpoint}
-      />
-      <ToolButton
-        icon={Gauge}
-        label="Profiler"
-        tip="Profiler : mesurer le temps passé sur chaque ligne (sans instrumentation)"
-        disabled={!canProfile}
-        onClick={onProfile}
-      />
-      <ToolSeparator />
-      <ToolButton
-        icon={MessageSquareCode}
-        label="Commenter les lignes"
-        shortcut="Ctrl+K, Ctrl+C"
-        onClick={() => editorAction('editor.action.addCommentLine')}
-      />
-      <ToolButton
-        icon={MessageSquareOff}
-        label="Décommenter les lignes"
-        shortcut="Ctrl+K, Ctrl+U"
-        onClick={() => editorAction('editor.action.removeCommentLine')}
-      />
-      <ToolButton
-        icon={ListIndentDecrease}
-        label="Réduire le retrait"
-        onClick={() => editorAction('editor.action.outdentLines')}
-      />
-      <ToolButton
-        icon={ListIndentIncrease}
-        label="Augmenter le retrait"
-        onClick={() => editorAction('editor.action.indentLines')}
-      />
+      <ToolGroup label="Exécution">
+        <ToolButton
+          icon={Square}
+          iconFill
+          label="Arrêter"
+          tip="Arrêter le débogage ou le profilage"
+          shortcut="Alt+Pause"
+          variant="danger"
+          disabled={!canStop}
+          onClick={onStop}
+        />
+        <ToolButton
+          icon={Check}
+          label="Analyser"
+          tip="Analyser : vérifier la syntaxe sans rien exécuter"
+          shortcut="Ctrl+F5"
+          disabled={locked}
+          onClick={onAnalyze}
+        />
+      </ToolGroup>
+      <ToolGroup label="Débogage">
+        <ToolButton
+          icon={ArrowDownToDot}
+          label="Pas à pas"
+          tip="Pas à pas : exécuter l'instruction suivante (session en pause)"
+          shortcut="F10"
+          disabled={!canStep}
+          onClick={onStep}
+        />
+        <ToolButton
+          icon={CircleDot}
+          label="Point d'arrêt"
+          tip="Poser / retirer un point d'arrêt sur la ligne du curseur"
+          shortcut="F9"
+          onClick={onToggleBreakpoint}
+        />
+        <ToolButton
+          icon={Gauge}
+          label="Profiler"
+          tip="Profiler : mesurer le temps passé sur chaque ligne (sans instrumentation)"
+          disabled={!canProfile}
+          onClick={onProfile}
+        />
+      </ToolGroup>
+      <ToolGroup label="Mise en forme">
+        <ToolButton
+          icon={MessageSquareCode}
+          label="Commenter les lignes"
+          shortcut="Ctrl+K, Ctrl+C"
+          onClick={() => editorAction('editor.action.addCommentLine')}
+        />
+        <ToolButton
+          icon={MessageSquareOff}
+          label="Décommenter les lignes"
+          shortcut="Ctrl+K, Ctrl+U"
+          onClick={() => editorAction('editor.action.removeCommentLine')}
+        />
+        <ToolButton
+          icon={ListIndentDecrease}
+          label="Réduire le retrait"
+          onClick={() => editorAction('editor.action.outdentLines')}
+        />
+        <ToolButton
+          icon={ListIndentIncrease}
+          label="Augmenter le retrait"
+          onClick={() => editorAction('editor.action.indentLines')}
+        />
+      </ToolGroup>
       <span className="toolbar-spacer" />
       {readOnly && (
         <span

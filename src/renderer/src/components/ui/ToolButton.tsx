@@ -69,7 +69,21 @@ export function ToolButton({
   )
 }
 
-/** Trait vertical entre deux groupes de boutons. */
-export function ToolSeparator(): JSX.Element {
-  return <span className="tool-sep" aria-hidden="true" />
+/**
+ * Groupe de boutons de même famille (fichiers, presse-papiers, exécution…).
+ * Thèmes classiques : groupes séparés par un trait, comme SSMS ; thèmes en
+ * cartes (Sauge) : chaque groupe forme une pastille.
+ */
+export function ToolGroup({
+  children,
+  label
+}: {
+  children: ReactNode
+  label?: string
+}): JSX.Element {
+  return (
+    <span className="tool-group" role="group" aria-label={label}>
+      {children}
+    </span>
+  )
 }

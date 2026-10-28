@@ -12,6 +12,12 @@ export interface ThemeDef {
   tagline: string
   base: 'dark' | 'light'
   /**
+   * Allure de la coque : « classic » = zones collées comme SSMS ; « cards » =
+   * panneaux en cartes arrondies sur un fond, groupes de boutons en pastilles
+   * (identité propre à GTrace, thèmes Sauge).
+   */
+  shell?: 'classic' | 'cards'
+  /**
    * Variables CSS surchargées (clés sans « -- »). Outre les couleurs de base,
    * chaque thème décrit sa « coque » à la manière de SSMS : barres (chrome),
    * bandeau des onglets (band), onglet actif, barre de requête et barre d'état.
@@ -20,6 +26,122 @@ export interface ThemeDef {
 }
 
 export const THEMES: ThemeDef[] = [
+  {
+    id: 'sauge',
+    label: 'Sauge et sable',
+    tagline: 'Vert sauge, lin et sable, repères terracotta — le thème GTrace',
+    base: 'light',
+    shell: 'cards',
+    vars: {
+      bg: '#E8EEE5',
+      'bg-panel': '#F3F6EF',
+      'bg-input': '#FAFBF6',
+      'bg-hover': 'rgba(47, 107, 79, 0.08)',
+      border: '#D3DDCF',
+      'border-strong': '#B7C6B3',
+      text: '#1E2A24',
+      'text-dim': '#5E7066',
+      accent: '#2F6B4F',
+      'accent-dim': 'rgba(47, 107, 79, 0.13)',
+      run: '#2F6B4F',
+      'run-dim': 'rgba(47, 107, 79, 0.14)',
+      error: '#B5482F',
+      'error-dim': 'rgba(181, 72, 47, 0.12)',
+      ok: '#3E8E5E',
+      overlay: 'rgba(20, 32, 26, 0.35)',
+      shadow: 'rgba(30, 42, 36, 0.18)',
+      zebra: 'rgba(47, 107, 79, 0.04)',
+      'heat-0': '#B9CDB8',
+      'heat-1': '#D9C27A',
+      'heat-2': '#D9945A',
+      'heat-3': '#B5482F',
+      chrome: '#D8E2D4',
+      'chrome-border': '#C3D0BF',
+      band: '#AFC4AD',
+      'band-fg': '#2A3F33',
+      'band-hover': 'rgba(255, 255, 255, 0.28)',
+      'tab-active': '#F8F9F3',
+      'tab-active-fg': '#1E2A24',
+      querybar: '#ECDFBE',
+      'querybar-fg': '#5A4520',
+      statusbar: '#2F6B4F',
+      'statusbar-fg': '#E4EFE6',
+      'accent-fg': '#FFFFFF',
+      'run-fg': '#FFFFFF',
+      surface: '#F3F6EF',
+      editor: '#F8F9F3',
+      'panel-head': '#E5ECE0',
+      grp: '#EFF3EA',
+      marker: '#C8643B',
+      'ic-folder': '#C29236',
+      'ic-db': '#4B7C8F',
+      'ic-table': '#2F6B4F',
+      'ic-view': '#3F7F86',
+      'ic-proc': '#C8643B',
+      'ic-func': '#7A62A8',
+      'ic-key': '#C29236',
+      'ic-column': '#7C8B81',
+      'ic-server': '#4B7C8F'
+    }
+  },
+  {
+    id: 'sauge-nuit',
+    label: 'Sauge nuit',
+    tagline: 'La famille Sauge en sombre, pour le soir et les longues sessions',
+    base: 'dark',
+    shell: 'cards',
+    vars: {
+      bg: '#151D19',
+      'bg-panel': '#1B2520',
+      'bg-input': '#18211D',
+      'bg-hover': 'rgba(127, 184, 154, 0.08)',
+      border: '#2C3A33',
+      'border-strong': '#3A4B42',
+      text: '#DCE6DF',
+      'text-dim': '#8A9C91',
+      accent: '#7FB89A',
+      'accent-dim': 'rgba(127, 184, 154, 0.16)',
+      run: '#3E8E5E',
+      'run-dim': 'rgba(62, 142, 94, 0.18)',
+      error: '#D9654A',
+      'error-dim': 'rgba(217, 101, 74, 0.16)',
+      ok: '#6CC08E',
+      overlay: 'rgba(0, 0, 0, 0.6)',
+      shadow: 'rgba(0, 0, 0, 0.5)',
+      zebra: 'rgba(255, 255, 255, 0.025)',
+      'heat-0': '#3A4A42',
+      'heat-1': '#8A7A3C',
+      'heat-2': '#B5713F',
+      'heat-3': '#C4513A',
+      chrome: '#151D19',
+      'chrome-border': '#2C3A33',
+      band: '#0F1613',
+      'band-fg': '#8FA597',
+      'band-hover': 'rgba(255, 255, 255, 0.06)',
+      'tab-active': '#18211D',
+      'tab-active-fg': '#DCE6DF',
+      querybar: '#2E2A1E',
+      'querybar-fg': '#E6D3A3',
+      statusbar: '#0F1613',
+      'statusbar-fg': '#9FB3A6',
+      'accent-fg': '#102017',
+      'run-fg': '#F2F7F3',
+      surface: '#1B2520',
+      editor: '#18211D',
+      'panel-head': '#222F29',
+      grp: '#1D2823',
+      marker: '#D9784F',
+      'ic-folder': '#D3A85A',
+      'ic-db': '#6FA3B5',
+      'ic-table': '#7FB89A',
+      'ic-view': '#6FB3A8',
+      'ic-proc': '#D9784F',
+      'ic-func': '#B39DDB',
+      'ic-key': '#D3A85A',
+      'ic-column': '#8A9C91',
+      'ic-server': '#6FA3B5'
+    }
+  },
   {
     id: 'azur',
     label: 'Azur clair',
@@ -238,7 +360,7 @@ export const THEMES: ThemeDef[] = [
   }
 ]
 
-export const DEFAULT_THEME_ID = 'azur'
+export const DEFAULT_THEME_ID = 'sauge'
 
 export function findTheme(id: string): ThemeDef {
   return THEMES.find((t) => t.id === id) ?? THEMES.find((t) => t.id === DEFAULT_THEME_ID)!

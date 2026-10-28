@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '../theme/applyTheme'
+import {
+  applyAppearance,
+  DEFAULT_APPEARANCE,
+  THEME_VERSION,
+  type Appearance
+} from '../theme/applyTheme'
 
 const KEY = 'gtrace.appearance'
 
@@ -9,7 +14,16 @@ function load(): Appearance {
     if (!raw) return DEFAULT_APPEARANCE
     // Fusion avec les valeurs par défaut : un réglage ajouté plus tard ne casse
     // pas une configuration enregistrée avant son existence.
-    return { ...DEFAULT_APPEARANCE, ...(JSON.parse(raw) as Partial<Appearance>) }
+    const saved = JSON.parse(raw) as Partial<Appearance>
+    const merged: Appearance = { ...DEFAULT_APPEARANCE, ...saved }
+    // Nouveau thème par défaut : qui était resté sur l'ancien (Azur) passe à
+    // Sauge une seule fois ; un choix fait ensuite est respecté.
+    if ((saved.themeVersion ?? 1) < THEME_VERSION) {
+      if (saved.themeId === undefined || saved.themeId === 'azur')
+        merged.themeId = DEFAULT_APPEARANCE.themeId
+      merged.themeVersion = THEME_VERSION
+    }
+    return merged
   } catch {
     return DEFAULT_APPEARANCE
   }

@@ -57,28 +57,45 @@ const SQL_RULES: Record<string, monaco.editor.ITokenThemeRule[]> = {
     { token: 'keyword.sql', foreground: 'ffd400' },
     { token: 'string.sql', foreground: '00e05a' },
     { token: 'comment.sql', foreground: '9a9a9a' }
+  ],
+  // Famille Sauge : mots-clés forêt, textes terracotta, nombres eucalyptus.
+  sauge: [
+    { token: 'keyword.sql', foreground: '2f6b4f', fontStyle: 'bold' },
+    { token: 'string.sql', foreground: 'b5532c' },
+    { token: 'comment.sql', foreground: '7c8b81', fontStyle: 'italic' },
+    { token: 'number.sql', foreground: '3f6f80' }
+  ],
+  saugeNuit: [
+    { token: 'keyword.sql', foreground: '7fb89a', fontStyle: 'bold' },
+    { token: 'string.sql', foreground: 'e09a6f' },
+    { token: 'comment.sql', foreground: '6e8077', fontStyle: 'italic' },
+    { token: 'number.sql', foreground: '7fb3c4' }
   ]
 }
 
 // Un thème d'éditeur par thème d'application : même fond que les panneaux.
 for (const t of THEMES) {
   const dark = t.base === 'dark'
-  const surface = t.vars.surface ?? (dark ? '#14161a' : '#ffffff')
+  const surface = t.vars.editor ?? t.vars.surface ?? (dark ? '#14161a' : '#ffffff')
   monaco.editor.defineTheme(`gtrace-${t.id}`, {
     base: dark ? 'vs-dark' : 'vs',
     inherit: true,
     rules:
-      t.id === 'azur'
-        ? SQL_RULES.light
-        : t.id === 'ambre'
-          ? SQL_RULES.amber
-          : t.id === 'contrast'
-            ? SQL_RULES.contrast
-            : SQL_RULES.vsDark,
+      t.id === 'sauge'
+        ? SQL_RULES.sauge
+        : t.id === 'sauge-nuit'
+          ? SQL_RULES.saugeNuit
+          : t.id === 'azur'
+            ? SQL_RULES.light
+            : t.id === 'ambre'
+              ? SQL_RULES.amber
+              : t.id === 'contrast'
+                ? SQL_RULES.contrast
+                : SQL_RULES.vsDark,
     colors: {
       'editor.background': surface,
       'editorGutter.background': surface,
-      'editor.lineHighlightBackground': dark ? '#ffffff0b' : '#f0f4f8',
+      'editor.lineHighlightBackground': dark ? '#ffffff0b' : t.shell === 'cards' ? '#eef2e8' : '#f0f4f8',
       'editorLineNumber.foreground': dark ? '#5a606b' : '#9aa4b0',
       'editorLineNumber.activeForeground': dark ? '#a3a9b3' : '#3d4b59'
     }
@@ -213,7 +230,7 @@ export default function CodeEditor({
       value,
       language: 'sql',
       theme: monacoTheme,
-      fontFamily: "'JetBrains Mono', Consolas, 'Cascadia Mono', monospace",
+      fontFamily: "'JetBrains Mono Variable', 'JetBrains Mono', Consolas, 'Cascadia Mono', monospace",
       fontSize: editorFontSize,
       lineHeight: 20,
       minimap: { enabled: false },
@@ -233,6 +250,9 @@ export default function CodeEditor({
     })
     editorRef.current = editor
     mountedEditor = editor
+    // La police embarquée arrive après la création de l'éditeur : sans nouvelle
+    // mesure, le curseur et la sélection se décaleraient du texte.
+    void document.fonts.ready.then(() => monaco.editor.remeasureFonts())
     collectionRef.current = editor.createDecorationsCollection()
     bpCollectionRef.current = editor.createDecorationsCollection()
 

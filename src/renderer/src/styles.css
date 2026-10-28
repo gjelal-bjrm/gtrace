@@ -14,8 +14,10 @@
   --error: #d96c6c;
   --error-dim: rgba(217, 108, 108, 0.14);
   --ok: #7dbb7d;
-  --mono: 'JetBrains Mono', Consolas, 'Cascadia Mono', monospace;
-  --ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  /* Polices embarquées : Inter pour l'interface (lisible en petit, chiffres
+     alignés), JetBrains Mono pour le code et les grilles (0/O, 1/l/I distincts). */
+  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', Consolas, 'Cascadia Mono', monospace;
+  --ui: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
   /* Valeurs de repli : surchargées par le thème actif (theme/applyTheme.ts). */
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: rgba(0, 0, 0, 0.5);
@@ -42,6 +44,12 @@
   --accent-fg: #16181d;
   --surface: #14161a;
   --run-fg: #ffffff;
+  /* Thèmes en cartes (Sauge) : fond de l'éditeur, en-têtes de panneaux,
+     pastilles de boutons, repères. Par défaut, déduits de la coque classique. */
+  --editor: var(--surface);
+  --panel-head: var(--chrome);
+  --grp: transparent;
+  --marker: var(--tab-active);
 }
 
 * {
